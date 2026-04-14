@@ -1,0 +1,86 @@
+CASE
+    WHEN NVL(po_change_order.co_sequence,0) = 0
+    THEN poapp.selected_approver
+    ELSE
+        CASE
+            WHEN wf.111_anm IS NOT NULL THEN wf.111_anm
+            WHEN wf.110_anm IS NOT NULL THEN wf.110_anm
+            WHEN wf.19_anm  IS NOT NULL THEN wf.19_anm
+            WHEN wf.18_anm  IS NOT NULL THEN wf.18_anm
+            WHEN wf.17_anm  IS NOT NULL THEN wf.17_anm
+            WHEN wf.16_anm  IS NOT NULL THEN wf.16_anm
+            WHEN wf.15_anm  IS NOT NULL THEN wf.15_anm
+            WHEN wf.14_anm  IS NOT NULL THEN wf.14_anm
+            WHEN wf.13_anm  IS NOT NULL THEN wf.13_anm
+            WHEN wf.12_anm  IS NOT NULL THEN wf.12_anm
+            WHEN wf.11_anm  IS NOT NULL THEN wf.11_anm
+        END
+END AS selected_approver,
+
+CASE
+    WHEN NVL(po_change_order.co_sequence,0) = 0
+    THEN poapp.selected_approval_dt
+    ELSE
+        CASE
+            WHEN wf.111_dt IS NOT NULL THEN wf.111_dt
+            WHEN wf.110_dt IS NOT NULL THEN wf.110_dt
+            WHEN wf.19_dt  IS NOT NULL THEN wf.19_dt
+            WHEN wf.18_dt  IS NOT NULL THEN wf.18_dt
+            WHEN wf.17_dt  IS NOT NULL THEN wf.17_dt
+            WHEN wf.16_dt  IS NOT NULL THEN wf.16_dt
+            WHEN wf.15_dt  IS NOT NULL THEN wf.15_dt
+            WHEN wf.14_dt  IS NOT NULL THEN wf.14_dt
+            WHEN wf.13_dt  IS NOT NULL THEN wf.13_dt
+            WHEN wf.12_dt  IS NOT NULL THEN wf.12_dt
+            WHEN wf.11_dt  IS NOT NULL THEN wf.11_dt
+        END
+END AS selected_approval_dt,
+
+
+CASE
+    WHEN NVL(po_change_order.co_sequence,0) > 0 THEN
+        CASE
+            WHEN wf.111_dt IS NOT NULL THEN wf.110_dt
+            WHEN wf.110_dt IS NOT NULL THEN wf.19_dt
+            WHEN wf.19_dt  IS NOT NULL THEN wf.18_dt
+            WHEN wf.18_dt  IS NOT NULL THEN wf.17_dt
+            WHEN wf.17_dt  IS NOT NULL THEN wf.16_dt
+            WHEN wf.16_dt  IS NOT NULL THEN wf.15_dt
+            WHEN wf.15_dt  IS NOT NULL THEN wf.14_dt
+            WHEN wf.14_dt  IS NOT NULL THEN wf.13_dt
+            WHEN wf.13_dt  IS NOT NULL THEN wf.12_dt
+            WHEN wf.12_dt  IS NOT NULL THEN wf.11_dt
+        END
+    ELSE poapp.previous_approval_dt
+END AS previous_approval_dt
+
+
+
+CASE
+    WHEN NVL(po_change_order.co_sequence,0) > 0 THEN
+        CASE
+            WHEN wf.111_anm IS NOT NULL THEN wf.110_anm
+            WHEN wf.110_anm IS NOT NULL THEN wf.19_anm
+            WHEN wf.19_anm  IS NOT NULL THEN wf.18_anm
+            WHEN wf.18_anm  IS NOT NULL THEN wf.17_anm
+            WHEN wf.17_anm  IS NOT NULL THEN wf.16_anm
+            WHEN wf.16_anm  IS NOT NULL THEN wf.15_anm
+            WHEN wf.15_anm  IS NOT NULL THEN wf.14_anm
+            WHEN wf.14_anm  IS NOT NULL THEN wf.13_anm
+            WHEN wf.13_anm  IS NOT NULL THEN wf.12_anm
+            WHEN wf.12_anm  IS NOT NULL THEN wf.11_anm
+        END
+    ELSE poapp.previous_approver
+END AS previous_approver
+
+
+ROW_NUMBER() OVER (
+    PARTITION BY poh.po_header_id, pov.version_id
+    ORDER BY fwh.assigneddate, fwh.taskid
+) seq
+
+ROW_NUMBER() OVER (
+    PARTITION BY po_header_id, co_sequence
+    ORDER BY approved_dt
+) AS seq
+
