@@ -1,27 +1,62 @@
-AND (
-       :P_SELECTED_APPROVER IS NULL
-    OR poapp.l1_aid = :P_SELECTED_APPROVER
-    OR poapp.l2_aid = :P_SELECTED_APPROVER
-    OR poapp.l3_aid = :P_SELECTED_APPROVER
-    OR poapp.l4_aid = :P_SELECTED_APPROVER
-    OR poapp.l5_aid = :P_SELECTED_APPROVER
-    OR wf.l1_aid = :P_SELECTED_APPROVER
-    OR wf.l2_aid = :P_SELECTED_APPROVER
-    ...
-    OR wf.l11_aid = :P_SELECTED_APPROVER
-)
 CASE
-    WHEN :P_SELECTED_APPROVER IS NULL THEN poapp.selected_approver
-    WHEN poapp.selected_approver_id = :P_SELECTED_APPROVER THEN poapp.selected_approver
-    WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN wf.l1
-    WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l2
-    WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l3
-    WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l4
-    WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l5
-    WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l6
-    WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l7
-    WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l8
-    WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l9
-    WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l10
-    WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l11
-END AS selected_approver
+    WHEN po_change_order.is_change_order = 'YES' THEN
+        CASE
+            WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+            WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l1_anm
+            WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l2_anm
+            WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l3_anm
+            WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l4_anm
+            WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l5_anm
+            WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l6_anm
+            WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l7_anm
+            WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l8_anm
+            WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l9_anm
+            WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l10_anm
+        END
+    ELSE poapp.previous_approver
+END AS previous_approver
+
+CASE
+    WHEN :P_SELECTED_APPROVER IS NULL THEN
+        CASE
+            WHEN po_change_order.co_sequence = 0
+            THEN poapp.selected_approval_dt
+            ELSE COALESCE(wf.l11_dt, wf.l10_dt, wf.l9_dt, wf.l8_dt, wf.l7_dt,
+                          wf.l6_dt, wf.l5_dt, wf.l4_dt, wf.l3_dt, wf.l2_dt, wf.l1_dt)
+        END
+
+    WHEN po_change_order.co_sequence = 0
+         AND poapp.selected_approver_id = :P_SELECTED_APPROVER
+    THEN poapp.selected_approval_dt
+
+    WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN wf.l1_dt
+    WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l2_dt
+    WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l3_dt
+    WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l4_dt
+    WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l5_dt
+    WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l6_dt
+    WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l7_dt
+    WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l8_dt
+    WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l9_dt
+    WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l10_dt
+    WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l11_dt
+END AS selected_approval_dt
+
+CASE
+    WHEN po_change_order.is_change_order = 'YES' THEN
+        CASE
+            WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+            WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l1_anm
+            WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l2_anm
+            WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l3_anm
+            WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l4_anm
+            WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l5_anm
+            WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l6_anm
+            WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l7_anm
+            WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l8_anm
+            WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l9_anm
+            WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l10_anm
+        END
+    ELSE poapp.previous_approver
+END AS previous_approver
+
