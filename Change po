@@ -60,3 +60,22 @@ CASE
     ELSE poapp.previous_approver
 END AS previous_approver
 
+
+CASE
+    WHEN po_change_order.is_change_order = 'YES' THEN
+        CASE
+            WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+            WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l1_dt
+            WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l2_dt
+            WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l3_dt
+            WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l4_dt
+            WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l5_dt
+            WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l6_dt
+            WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l7_dt
+            WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l8_dt
+            WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l9_dt
+            WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l10_dt
+        END
+    ELSE poapp.previous_approval_dt
+END AS previous_approval_dt
+
