@@ -10,3 +10,18 @@ AND (
     ...
     OR wf.l11_aid = :P_SELECTED_APPROVER
 )
+CASE
+    WHEN :P_SELECTED_APPROVER IS NULL THEN poapp.selected_approver
+    WHEN poapp.selected_approver_id = :P_SELECTED_APPROVER THEN poapp.selected_approver
+    WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN wf.l1
+    WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l2
+    WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l3
+    WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l4
+    WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l5
+    WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l6
+    WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l7
+    WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l8
+    WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l9
+    WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l10
+    WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l11
+END AS selected_approver
