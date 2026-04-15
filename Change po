@@ -1,8 +1,23 @@
 AND (
        :P_SELECTED_APPROVER IS NULL
-    OR l1_approver_id = :P_SELECTED_APPROVER
-    OR l2_approver_id = :P_SELECTED_APPROVER
-    OR l3_approver_id = :P_SELECTED_APPROVER
-    OR l4_approver_id = :P_SELECTED_APPROVER
-    OR l5_approver_id = :P_SELECTED_APPROVER
+    OR poapp.l1_approver_id = :P_SELECTED_APPROVER
+    OR poapp.l2_approver_id = :P_SELECTED_APPROVER
+    OR poapp.l3_approver_id = :P_SELECTED_APPROVER
+    OR poapp.l4_approver_id = :P_SELECTED_APPROVER
+    OR poapp.l5_approver_id = :P_SELECTED_APPROVER
+    OR poapp.l6_approver_id = :P_SELECTED_APPROVER
+    OR poapp.l7_approver_id = :P_SELECTED_APPROVER
+    OR poapp.l8_approver_id = :P_SELECTED_APPROVER
+    OR poapp.l9_approver_id = :P_SELECTED_APPROVER
+    OR wf.l1_aid = :P_SELECTED_APPROVER
+    OR wf.l2_aid = :P_SELECTED_APPROVER
+    OR wf.l3_aid = :P_SELECTED_APPROVER
+    OR wf.l4_aid = :P_SELECTED_APPROVER
+    OR wf.l5_aid = :P_SELECTED_APPROVER
+    OR wf.l6_aid = :P_SELECTED_APPROVER
+    OR wf.l7_aid = :P_SELECTED_APPROVER
+    OR wf.l8_aid = :P_SELECTED_APPROVER
+    OR wf.l9_aid = :P_SELECTED_APPROVER
+    OR wf.l10_aid = :P_SELECTED_APPROVER
+    OR wf.l11_aid = :P_SELECTED_APPROVER
 )
