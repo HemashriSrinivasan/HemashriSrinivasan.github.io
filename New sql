@@ -418,6 +418,105 @@ CASE
       WHEN wf.l1_dt IS NULL
         THEN poapp.previous_approval_dt
     END
-
+h
 END AS previous_approval_dt,
+
+
+
+PO_APPROVAL AS (
+  SELECT * FROM (
+    SELECT
+      po_header_id,
+      prc_bu_id,
+      segment1,
+      approver_id,
+      approver,
+      a_note,
+      approved_dt,
+      ROW_NUMBER() OVER(
+        PARTITION BY po_header_id
+        ORDER BY approved_dt
+      ) AS seq
+    FROM (
+
+      -- ✅ BLOCK 1: po_action_history (existing)
+      SELECT
+        pha.po_header_id,
+        pha.segment1,
+        pha.prc_bu_id,
+        pah.performer_id AS approver_id,
+        pea.email_address AS approver,
+        CAST(REPLACE(REPLACE(NVL(patc.user_comment,''),
+             CHR(9),''),CHR(10),'') AS VARCHAR2(500)) AS a_note,
+        pah.action_date AS approved_dt
+      FROM po_action_history pah
+      JOIN po_headers_all pha
+        ON pha.po_header_id = pah.object_id
+      JOIN po_versions pov
+        ON pov.version_id = pah.po_version_id
+        AND pov.po_header_id = pah.object_id
+      LEFT JOIN PO_LATEST_SUBMIT pls
+        ON pls.po_header_id = pha.po_header_id
+      JOIN per_person_names_f_v ppnfv
+        ON pah.performer_id = ppnfv.person_id
+        AND ppnfv.name_type = 'GLOBAL'
+        AND SYSDATE BETWEEN ppnfv.effective_start_date
+                        AND ppnfv.effective_end_date
+      JOIN per_users pu
+        ON pu.person_id = pah.performer_id
+      JOIN per_email_addresses pea
+        ON pea.person_id = pu.person_id
+      LEFT JOIN por_approval_task_comments patc
+        ON patc.object_id = pah.object_id
+        AND patc.performer_id = pah.performer_id
+        AND patc.identification_key = pah.identification_key
+      WHERE pah.action_code = 'APPROVE'
+        AND pah.performer_id IS NOT NULL
+        AND NVL(pov.co_sequence, 0) = 0
+        AND pah.action_date > NVL(pls.latest_submit_date, 
+                                  pah.action_date - 1)
+
+      UNION ALL
+
+      -- ✅ BLOCK 2: wftaskhistory for BASE PO (NEW - handles resubmit case)
+      SELECT
+        poh.po_header_id,
+        poh.segment1,
+        poh.prc_bu_id,
+        pu.person_id AS approver_id,
+        pea.email_address AS approver,
+        NULL AS a_note,
+        fwh.updateddate AS approved_dt
+      FROM po_headers_all poh
+      JOIN po_versions pov
+        ON pov.po_header_id = poh.po_header_id
+        AND NVL(pov.co_sequence, 0) = 0        -- ✅ base PO only
+      JOIN fa_fusion_soainfra.wftaskhistory fwh
+        ON fwh.compositeinstanceid = pov.approval_instance_id
+      LEFT JOIN PO_LATEST_SUBMIT pls
+        ON pls.po_header_id = poh.po_header_id
+      JOIN per_users pu
+        ON pu.username = fwh.updatedby
+      JOIN per_email_addresses pea
+        ON pea.person_id = pu.person_id
+      WHERE fwh.state = 'OUTCOME_UPDATED'
+        AND fwh.outcome = 'APPROVE'
+        AND fwh.updatedby != 'workflowsystem'
+        -- ✅ only new round approvals
+        AND fwh.updateddate > NVL(pls.latest_submit_date,
+                                  fwh.updateddate - 1)
+    )
+  )
+  PIVOT (
+    MAX(approver_id) AS aid,
+    MAX(approver)    AS anm,
+    MAX(a_note)      AS a_nte,
+    MAX(approved_dt) AS a_dt
+    FOR seq IN (
+      1 AS l1, 2 AS l2, 3 AS l3, 4 AS l4,
+      5 AS l5, 6 AS l6, 7 AS l7, 8 AS l8,
+      9 AS l9, 10 AS l10, 11 AS l11
+    )
+  )
+)
 
