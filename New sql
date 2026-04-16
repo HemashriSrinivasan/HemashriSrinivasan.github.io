@@ -185,6 +185,83 @@ CASE
 
   -- No filter + Change Order (original logic)
   ELSE CASE
+
+
+
+
+PO_APPROVAL AS (
+  SELECT * FROM (
+    SELECT
+      po_header_id,
+      prc_bu_id,
+      segment1,
+      approver_id,
+      approver,
+      a_note,
+      approved_dt,
+      ROW_NUMBER() OVER(
+        PARTITION BY po_header_id
+        ORDER BY approved_dt          -- ✅ now only orders within latest round
+      ) AS seq
+    FROM (
+      SELECT
+        pha.po_header_id,
+        pha.segment1,
+        pha.prc_bu_id,
+        pah.performer_id AS approver_id,
+        pea.email_address AS approver,
+        CAST(REPLACE(REPLACE(NVL(patc.user_comment,''),
+             CHR(9),''),CHR(10),'') AS VARCHAR2(500)) AS a_note,
+        pah.action_date AS approved_dt
+      FROM po_action_history pah
+      JOIN po_headers_all pha
+        ON pha.po_header_id = pah.object_id
+      JOIN po_versions pov
+        ON pov.version_id = pah.po_version_id
+        AND pov.po_header_id = pah.object_id
+      JOIN per_person_names_f_v ppnfv
+        ON pah.performer_id = ppnfv.person_id
+        AND ppnfv.name_type = 'GLOBAL'
+        AND SYSDATE BETWEEN ppnfv.effective_start_date
+                        AND ppnfv.effective_end_date
+      JOIN per_users pu
+        ON pu.person_id = pah.performer_id
+      JOIN per_email_addresses pea
+        ON pea.person_id = pu.person_id
+      LEFT JOIN por_approval_task_comments patc
+        ON patc.object_id = pah.object_id
+        AND patc.performer_id = pah.performer_id
+        AND patc.identification_key = pah.identification_key
+      WHERE pah.action_code = 'APPROVE'
+        AND pah.performer_id IS NOT NULL
+        AND NVL(pov.co_sequence, 0) = 0
+
+        -- ✅ KEY FIX: Only approvals AFTER the latest submit
+        AND pah.action_date > (
+              SELECT MAX(pah2.action_date)
+              FROM po_action_history pah2
+              WHERE pah2.object_id = pha.po_header_id
+              AND pah2.action_code = 'SUBMIT'
+              AND NVL((
+                    SELECT NVL(pov2.co_sequence,0) 
+                    FROM po_versions pov2 
+                    WHERE pov2.version_id = pah2.po_version_id
+                  ),0) = 0
+            )
+    )
+  )
+  PIVOT (
+    MAX(approver_id) AS aid,
+    MAX(approver)    AS anm,
+    MAX(a_note)      AS a_nte,
+    MAX(approved_dt) AS a_dt
+    FOR seq IN (
+      1 AS l1, 2 AS l2, 3 AS l3, 4 AS l4,
+      5 AS l5, 6 AS l6, 7 AS l7, 8 AS l8,
+      9 AS l9, 10 AS l10, 11 AS l11
+    )
+  )
+)
     WHEN wf.l11_dt IS NOT NULL AND wf.l11_dt != wf.l10_dt THEN wf.l10_dt
     WHEN wf.l10_dt IS NOT NULL AND wf.l10_dt != wf.l9_dt  THEN wf.l9_dt
     WHEN wf.l9_dt  IS NOT NULL AND wf.l9_dt  != wf.l8_dt  THEN wf.l8_dt
