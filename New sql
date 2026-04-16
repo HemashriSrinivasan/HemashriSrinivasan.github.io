@@ -1,519 +1,199 @@
-WITH base_po_rows AS (
-    SELECT
-        poh.po_header_id,
-        poh.prc_bu_id,
-        poh.segment1,
-        CAST(NULL AS NUMBER)         AS co_sequence,
-        CAST(NULL AS VARCHAR2(80))   AS co_num,
-        CAST(NULL AS NUMBER)         AS version_id,
-        CAST(NULL AS NUMBER)         AS revision_num,
-        'NO'                         AS is_change_order,
-        poh.document_status          AS row_status,
-        poh.created_by               AS row_created_by,
-        poh.creation_date            AS row_creation_date,
-        poh.submit_date              AS row_submit_date,
-        CAST(NULL AS DATE)           AS row_approved_date,
-        CAST(NULL AS VARCHAR2(2000)) AS row_description,
-        CAST(NULL AS VARCHAR2(1))    AS co_canceled_flag,
-        CAST(NULL AS NUMBER)         AS approval_instance_id
-    FROM po_headers_all poh
-),
-change_order_rows AS (
-    SELECT
-        poh.po_header_id,
-        poh.prc_bu_id,
-        poh.segment1,
-        pov.co_sequence,
-        pov.co_num,
-        pov.version_id,
-        pov.revision_num,
-        'YES'                        AS is_change_order,
-        pov.change_order_status      AS row_status,
-        pov.created_by               AS row_created_by,
-        pov.creation_date            AS row_creation_date,
-        pov.submitted_date           AS row_submit_date,
-        pov.approved_date            AS row_approved_date,
-        pov.change_order_desc        AS row_description,
-        pov.co_canceled_flag         AS co_canceled_flag,
-        pov.approval_instance_id     AS approval_instance_id
-    FROM po_versions pov
-    JOIN po_headers_all poh
-        ON poh.po_header_id = pov.po_header_id
-    WHERE pov.co_sequence > 0
-),
-report_rows AS (
-    SELECT * FROM base_po_rows
-    UNION ALL
-    SELECT * FROM change_order_rows
-),
-
-/* =========================
-   BASE PO APPROVAL HISTORY
-   ========================= */
-base_po_approval_history AS (
-    /*
-     * FIX 1: Removed "AND NVL(pah.object_revision_num, 0) = 0"
-     * The reference (PO_APPROVAL CTE) has no object_revision_num filter.
-     * Keeping that filter caused PROCESSED POs with revision_num > 0
-     * to be silently excluded, producing NULL selected/previous approvers.
-     */
-    SELECT
-        pha.po_header_id,
-        pha.prc_bu_id,
-        pha.segment1,
-        pah.performer_id             AS approver_id,
-        pea.email_address            AS approver,
-        CAST(
-            REPLACE(REPLACE(NVL(patc.user_comment, ''), CHR(9), ''), CHR(10), '')
-            AS VARCHAR2(4000)
-        )                            AS a_note,
-        pah.action_date              AS approved_dt
-    FROM po_action_history pah
-    JOIN po_headers_all pha
-        ON pha.po_header_id = pah.object_id
-    JOIN per_person_names_f_v ppnfv
-        ON pah.performer_id          = ppnfv.person_id
-       AND ppnfv.name_type           = 'GLOBAL'
-       AND SYSDATE BETWEEN ppnfv.effective_start_date AND ppnfv.effective_end_date
-    JOIN per_users pu
-        ON pu.person_id              = pah.performer_id
-    JOIN per_email_addresses pea
-        ON pea.person_id             = pu.person_id
-    LEFT JOIN por_approval_task_comments patc
-        ON patc.object_id            = pah.object_id
-       AND patc.performer_id         = pah.performer_id
-       AND patc.identification_key   = pah.identification_key
-    WHERE pah.action_code            = 'APPROVE'
-      AND pah.performer_id           IS NOT NULL
-      AND pah.object_type_code       = 'PO'
-      /* object_revision_num filter intentionally removed — see FIX 1 above */
-
-    UNION ALL
-
-    /*
-     * FIX 2: Removed "AND NVL(pov.co_sequence, 0) = 0" from the po_versions join.
-     * The reference (PO_APPROVAL CTE) joins po_versions with NO co_sequence filter,
-     * pulling in all workflow approval records across all versions.
-     * The original filter excluded intermediate wftaskhistory approvals for
-     * PENDING APPROVAL POs (which had no co_sequence = 0/NULL version in scope),
-     * resulting in NULL selected/previous approvers for those rows.
-     */
-    SELECT
-        pha.po_header_id,
-        pha.prc_bu_id,
-        pha.segment1,
-        pu.person_id                 AS approver_id,
-        pea.email_address            AS approver,
-        CAST(
-            REPLACE(REPLACE(NVL(fwc.wfcomment, ''), CHR(9), ''), CHR(10), '')
-            AS VARCHAR2(4000)
-        )                            AS a_note,
-        fwh.assigneddate             AS approved_dt
-    FROM po_headers_all pha
-    JOIN po_versions pov
-        ON pov.po_header_id          = pha.po_header_id
-        /* co_sequence filter intentionally removed — see FIX 2 above */
-    JOIN fa_fusion_soainfra.wftaskhistory fwh
-        ON fwh.compositeinstanceid   = pov.approval_instance_id
-    JOIN per_users pu
-        ON pu.username               = fwh.updatedby
-    JOIN per_email_addresses pea
-        ON pea.person_id             = pu.person_id
-    LEFT JOIN fa_fusion_soainfra.wfcomments fwc
-        ON fwc.taskid                = fwh.taskid
-    WHERE fwh.state                  = 'OUTCOME UPDATED'
-      AND fwh.outcome                = 'APPROVE'
-      AND fwh.updatedby             <> 'workflowsystem'
-),
-base_po_approval_distinct AS (
-    SELECT
-        po_header_id,
-        prc_bu_id,
-        segment1,
-        approver_id,
-        approver,
-        a_note,
-        approved_dt
-    FROM (
-        SELECT
-            b.*,
-            LAG(approver_id) OVER (
-                PARTITION BY po_header_id
-                ORDER BY approved_dt, approver_id
-            ) AS prev_approver_id
-        FROM base_po_approval_history b
-    )
-    WHERE prev_approver_id IS NULL
-       OR prev_approver_id <> approver_id
-),
-base_po_approval_ranked AS (
-    SELECT
-        d.*,
-        ROW_NUMBER() OVER (
-            PARTITION BY po_header_id
-            ORDER BY approved_dt DESC, approver_id DESC
-        ) AS rn
-    FROM base_po_approval_distinct d
-),
-base_po_approval AS (
-    SELECT
-        po_header_id,
-        prc_bu_id,
-        segment1,
-        MAX(CASE WHEN rn = 1 THEN approver_id  END) AS selected_approver_id,
-        MAX(CASE WHEN rn = 1 THEN approver      END) AS selected_approver,
-        MAX(CASE WHEN rn = 1 THEN a_note        END) AS selected_note,
-        MAX(CASE WHEN rn = 1 THEN approved_dt   END) AS selected_approval_dt,
-        MAX(CASE WHEN rn = 2 THEN approver_id   END) AS previous_approver_id,
-        MAX(CASE WHEN rn = 2 THEN approver      END) AS previous_approver,
-        MAX(CASE WHEN rn = 2 THEN a_note        END) AS previous_note,
-        MAX(CASE WHEN rn = 2 THEN approved_dt   END) AS previous_approval_dt
-    FROM base_po_approval_ranked
-    GROUP BY po_header_id, prc_bu_id, segment1
-),
-
-/* =========================
-   CHANGE ORDER APPROVAL HISTORY
-   ========================= */
-co_approval_history AS (
-    SELECT
-        pov.po_header_id,
-        pov.co_sequence,
-        poh.prc_bu_id,
-        poh.segment1,
-        pah.performer_id             AS approver_id,
-        pea.email_address            AS approver,
-        CAST(
-            REPLACE(REPLACE(NVL(patc.user_comment, ''), CHR(9), ''), CHR(10), '')
-            AS VARCHAR2(4000)
-        )                            AS a_note,
-        pah.action_date              AS approved_dt
-    FROM po_versions pov
-    JOIN po_headers_all poh
-        ON poh.po_header_id          = pov.po_header_id
-    JOIN po_action_history pah
-        ON pah.po_version_id         = pov.version_id
-    JOIN per_person_names_f_v ppnfv
-        ON pah.performer_id          = ppnfv.person_id
-       AND ppnfv.name_type           = 'GLOBAL'
-       AND SYSDATE BETWEEN ppnfv.effective_start_date AND ppnfv.effective_end_date
-    JOIN per_users pu
-        ON pu.person_id              = pah.performer_id
-    JOIN per_email_addresses pea
-        ON pea.person_id             = pu.person_id
-    LEFT JOIN por_approval_task_comments patc
-        ON patc.object_id            = pah.object_id
-       AND patc.performer_id         = pah.performer_id
-       AND patc.identification_key   = pah.identification_key
-    WHERE pov.co_sequence            > 0
-      AND pah.action_code            = 'APPROVE'
-      AND pah.performer_id           IS NOT NULL
-
-    UNION ALL
-
-    SELECT
-        pov.po_header_id,
-        pov.co_sequence,
-        poh.prc_bu_id,
-        poh.segment1,
-        pu.person_id                 AS approver_id,
-        pea.email_address            AS approver,
-        CAST(
-            REPLACE(REPLACE(NVL(fwc.wfcomment, ''), CHR(9), ''), CHR(10), '')
-            AS VARCHAR2(4000)
-        )                            AS a_note,
-        fwh.assigneddate             AS approved_dt
-    FROM po_versions pov
-    JOIN po_headers_all poh
-        ON poh.po_header_id          = pov.po_header_id
-    JOIN fa_fusion_soainfra.wftaskhistory fwh
-        ON fwh.compositeinstanceid   = pov.approval_instance_id
-    JOIN per_users pu
-        ON pu.username               = fwh.updatedby
-    JOIN per_email_addresses pea
-        ON pea.person_id             = pu.person_id
-    LEFT JOIN fa_fusion_soainfra.wfcomments fwc
-        ON fwc.taskid                = fwh.taskid
-    WHERE pov.co_sequence            > 0
-      AND fwh.state                  = 'OUTCOME UPDATED'
-      AND fwh.outcome                = 'APPROVE'
-      AND fwh.updatedby             <> 'workflowsystem'
-),
-co_approval_distinct AS (
-    SELECT
-        po_header_id,
-        co_sequence,
-        prc_bu_id,
-        segment1,
-        approver_id,
-        approver,
-        a_note,
-        approved_dt
-    FROM (
-        SELECT
-            c.*,
-            LAG(approver_id) OVER (
-                PARTITION BY po_header_id, co_sequence
-                ORDER BY approved_dt, approver_id
-            ) AS prev_approver_id
-        FROM co_approval_history c
-    )
-    WHERE prev_approver_id IS NULL
-       OR prev_approver_id <> approver_id
-),
-co_approval_ranked AS (
-    SELECT
-        d.*,
-        ROW_NUMBER() OVER (
-            PARTITION BY po_header_id, co_sequence
-            ORDER BY approved_dt DESC, approver_id DESC
-        ) AS rn
-    FROM co_approval_distinct d
-),
-co_approval AS (
-    SELECT
-        po_header_id,
-        co_sequence,
-        prc_bu_id,
-        segment1,
-        MAX(CASE WHEN rn = 1 THEN approver_id  END) AS selected_approver_id,
-        MAX(CASE WHEN rn = 1 THEN approver      END) AS selected_approver,
-        MAX(CASE WHEN rn = 1 THEN a_note        END) AS selected_note,
-        MAX(CASE WHEN rn = 1 THEN approved_dt   END) AS selected_approval_dt,
-        MAX(CASE WHEN rn = 2 THEN approver_id   END) AS previous_approver_id,
-        MAX(CASE WHEN rn = 2 THEN approver      END) AS previous_approver,
-        MAX(CASE WHEN rn = 2 THEN a_note        END) AS previous_note,
-        MAX(CASE WHEN rn = 2 THEN approved_dt   END) AS previous_approval_dt
-    FROM co_approval_ranked
-    GROUP BY po_header_id, co_sequence, prc_bu_id, segment1
-),
-
-/* =========================
-   CHANGE ORDER PENDING APPROVER
-   ========================= */
-co_pending_approver AS (
-    SELECT
-        pov.po_header_id,
-        pov.co_sequence,
-        poh.prc_bu_id,
-        poh.segment1,
-        LISTAGG(
-            CASE
-                WHEN wf.state = 'INFO REQUESTED'
-                    THEN wf.updatedby || ' (Info Requested to ' || wf.assignees || ')'
-                ELSE wf.assignees
-            END,
-            ', '
-        ) WITHIN GROUP (ORDER BY wf.assigneddate) AS pending_with
-    FROM po_versions pov
-    JOIN po_headers_all poh
-        ON poh.po_header_id          = pov.po_header_id
-    JOIN fa_fusion_soainfra.wftask wf
-        ON wf.compositeinstanceid    = pov.approval_instance_id
-    WHERE pov.co_sequence            > 0
-      AND wf.state                   IN ('ASSIGNED', 'INFO REQUESTED')
-      AND wf.assignees               IS NOT NULL
-      AND wf.workflowpattern         NOT IN ('AGGREGATION', 'FYI')
-      AND wf.componentname           = 'DocumentApproval'
-    GROUP BY
-        pov.po_header_id,
-        pov.co_sequence,
-        poh.prc_bu_id,
-        poh.segment1
-),
-
-/* =========================
-   BASE PO PENDING APPROVER
-   ========================= */
-base_po_pending_approver AS (
-    SELECT
-        poh.po_header_id,
-        poh.prc_bu_id,
-        poh.segment1,
-        LISTAGG(
-            CASE
-                WHEN wf.state = 'INFO REQUESTED'
-                    THEN wf.updatedby || ' (Info Requested to ' || wf.assignees || ')'
-                ELSE wf.assignees
-            END,
-            ', '
-        ) WITHIN GROUP (ORDER BY wf.assigneddate) AS pending_with
-    FROM po_headers_all poh
-    JOIN po_versions pov
-        ON pov.po_header_id          = poh.po_header_id
-       AND NVL(pov.co_sequence, 0)   = 0
-    JOIN fa_fusion_soainfra.wftask wf
-        ON wf.compositeinstanceid    = pov.approval_instance_id
-    WHERE wf.state                   IN ('ASSIGNED', 'INFO REQUESTED')
-      AND wf.assignees               IS NOT NULL
-      AND wf.workflowpattern         NOT IN ('AGGREGATION', 'FYI')
-      AND wf.componentname           = 'DocumentApproval'
-    GROUP BY
-        poh.po_header_id,
-        poh.prc_bu_id,
-        poh.segment1
-)
-
-SELECT
-    gcc.segment1                     AS company_code,
-    fab.bu_name                      AS po_company_name,
-    rr.segment1                      AS po_number,
-    rr.co_num                        AS change_order_number,
-    rr.co_sequence,
-    rr.is_change_order               AS change_order,
-    rr.row_status                    AS status,
-    hp.party_name                    AS vendor_name,
-    pos.segment1                     AS vendor_number,
-    rr.row_created_by                AS created_by,
-    rr.row_creation_date             AS creation_date,
-    rr.row_submit_date               AS submit_date,
-    poh.currency_code,
-
-    (
-        SELECT SUM(ROUND(unit_price * quantity, 2))
-        FROM po_lines_all
-        WHERE po_header_id           = rr.po_header_id
-    ) AS po_amount,
-
-    (
-        SELECT SUM(
-            ROUND(
-                ROUND(pla.unit_price * pla.quantity, 2) *
-                NVL(
-                    (
-                        SELECT rat.conversion_rate
-                        FROM gl_daily_rates rat
-                        WHERE rat.from_currency    = poh.currency_code
-                          AND rat.to_currency      = 'USD'
-                          AND TRUNC(rat.conversion_date) = TRUNC(rr.row_creation_date)
-                          AND rat.conversion_type  = 'CORPORATE'
-                    ),
-                    1
-                ),
-                2
-            )
-        )
-        FROM po_lines_all pla
-        WHERE pla.po_header_id       = rr.po_header_id
-    ) AS po_usd_amount,
-
-    rr.row_approved_date             AS approved_date,
-    rr.row_description               AS description,
-
+CASE
+  -- Filter active + Base PO
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.co_sequence = 0 THEN
     CASE
-        WHEN rr.is_change_order = 'YES' THEN coa.selected_approver
-        ELSE                                 bpa.selected_approver
-    END AS selected_approver,
+      WHEN poapp.l1_aid  = :P_SELECTED_APPROVER THEN poapp.l1_approved_by
+      WHEN poapp.l2_aid  = :P_SELECTED_APPROVER THEN poapp.l2_approved_by
+      WHEN poapp.l3_aid  = :P_SELECTED_APPROVER THEN poapp.l3_approved_by
+      WHEN poapp.l4_aid  = :P_SELECTED_APPROVER THEN poapp.l4_approved_by
+      WHEN poapp.l5_aid  = :P_SELECTED_APPROVER THEN poapp.l5_approved_by
+      WHEN poapp.l6_aid  = :P_SELECTED_APPROVER THEN poapp.l6_approved_by
+      WHEN poapp.l7_aid  = :P_SELECTED_APPROVER THEN poapp.l7_approved_by
+      WHEN poapp.l8_aid  = :P_SELECTED_APPROVER THEN poapp.l8_approved_by
+      WHEN poapp.l9_aid  = :P_SELECTED_APPROVER THEN poapp.l9_approved_by
+      WHEN poapp.l10_aid = :P_SELECTED_APPROVER THEN poapp.l10_approved_by
+      WHEN poapp.l11_aid = :P_SELECTED_APPROVER THEN poapp.l11_approved_by
+    END
 
+  -- Filter active + Change Order
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.co_sequence > 0 THEN
     CASE
-        WHEN rr.is_change_order = 'YES' THEN coa.selected_approval_dt
-        ELSE                                 bpa.selected_approval_dt
-    END AS selected_approval_dt,
+      WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN wf.l1_anm
+      WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l2_anm
+      WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l3_anm
+      WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l4_anm
+      WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l5_anm
+      WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l6_anm
+      WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l7_anm
+      WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l8_anm
+      WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l9_anm
+      WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l10_anm
+      WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l11_anm
+    END
 
+  -- No filter + Base PO (original logic)
+  WHEN po_change_order.co_sequence = 0 
+    THEN poapp.selected_approver
+
+  -- No filter + Change Order (original logic)
+  ELSE COALESCE(wf.l11_anm, wf.l10_anm, wf.l9_anm, wf.l8_anm,
+                wf.l7_anm, wf.l6_anm, wf.l5_anm, wf.l4_anm,
+                wf.l3_anm, wf.l2_anm, wf.l1_anm)
+END AS selected_approver,
+
+CASE
+  -- Filter active + Base PO
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.co_sequence = 0 THEN
     CASE
-        WHEN rr.is_change_order = 'YES' THEN coa.previous_approver
-        ELSE                                 bpa.previous_approver
-    END AS previous_approver,
+      WHEN poapp.l1_aid  = :P_SELECTED_APPROVER THEN poapp.l1_approved_dt
+      WHEN poapp.l2_aid  = :P_SELECTED_APPROVER THEN poapp.l2_approved_dt
+      WHEN poapp.l3_aid  = :P_SELECTED_APPROVER THEN poapp.l3_approved_dt
+      WHEN poapp.l4_aid  = :P_SELECTED_APPROVER THEN poapp.l4_approved_dt
+      WHEN poapp.l5_aid  = :P_SELECTED_APPROVER THEN poapp.l5_approved_dt
+      WHEN poapp.l6_aid  = :P_SELECTED_APPROVER THEN poapp.l6_approved_dt
+      WHEN poapp.l7_aid  = :P_SELECTED_APPROVER THEN poapp.l7_approved_dt
+      WHEN poapp.l8_aid  = :P_SELECTED_APPROVER THEN poapp.l8_approved_dt
+      WHEN poapp.l9_aid  = :P_SELECTED_APPROVER THEN poapp.l9_approved_dt
+      WHEN poapp.l10_aid = :P_SELECTED_APPROVER THEN poapp.l10_approved_dt
+      WHEN poapp.l11_aid = :P_SELECTED_APPROVER THEN poapp.l11_approved_dt
+    END
 
+  -- Filter active + Change Order
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.co_sequence > 0 THEN
     CASE
-        WHEN rr.is_change_order = 'YES' THEN coa.previous_approval_dt
-        ELSE                                 bpa.previous_approval_dt
-    END AS previous_approval_dt,
+      WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN wf.l1_dt
+      WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l2_dt
+      WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l3_dt
+      WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l4_dt
+      WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l5_dt
+      WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l6_dt
+      WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l7_dt
+      WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l8_dt
+      WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l9_dt
+      WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l10_dt
+      WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l11_dt
+    END
 
+  -- No filter + Base PO (original logic)
+  WHEN po_change_order.co_sequence = 0 
+    THEN poapp.selected_approval_dt
+
+  -- No filter + Change Order (original logic)
+  ELSE COALESCE(wf.l11_dt, wf.l10_dt, wf.l9_dt, wf.l8_dt,
+                wf.l7_dt, wf.l6_dt, wf.l5_dt, wf.l4_dt,
+                wf.l3_dt, wf.l2_dt, wf.l1_dt)
+END AS selected_approval_dt,
+
+
+CASE
+  -- Filter active + Base PO
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.co_sequence = 0 THEN
     CASE
-        WHEN rr.is_change_order = 'YES' THEN cpa.pending_with
-        ELSE                                 bpp.pending_with
-    END AS pending_with,
+      WHEN poapp.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+      WHEN poapp.l2_aid  = :P_SELECTED_APPROVER THEN poapp.l1_approved_by
+      WHEN poapp.l3_aid  = :P_SELECTED_APPROVER THEN poapp.l2_approved_by
+      WHEN poapp.l4_aid  = :P_SELECTED_APPROVER THEN poapp.l3_approved_by
+      WHEN poapp.l5_aid  = :P_SELECTED_APPROVER THEN poapp.l4_approved_by
+      WHEN poapp.l6_aid  = :P_SELECTED_APPROVER THEN poapp.l5_approved_by
+      WHEN poapp.l7_aid  = :P_SELECTED_APPROVER THEN poapp.l6_approved_by
+      WHEN poapp.l8_aid  = :P_SELECTED_APPROVER THEN poapp.l7_approved_by
+      WHEN poapp.l9_aid  = :P_SELECTED_APPROVER THEN poapp.l8_approved_by
+      WHEN poapp.l10_aid = :P_SELECTED_APPROVER THEN poapp.l9_approved_by
+      WHEN poapp.l11_aid = :P_SELECTED_APPROVER THEN poapp.l10_approved_by
+    END
 
+  -- Filter active + Change Order
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.co_sequence > 0 THEN
     CASE
-        WHEN rr.is_change_order = 'YES'
-             AND rr.row_approved_date  IS NOT NULL
-             AND rr.row_submit_date    IS NOT NULL
-            THEN TRUNC(rr.row_approved_date)   - TRUNC(rr.row_submit_date)
-        WHEN rr.is_change_order = 'NO'
-             AND bpa.selected_approval_dt IS NOT NULL
-             AND rr.row_submit_date    IS NOT NULL
-            THEN TRUNC(bpa.selected_approval_dt) - TRUNC(rr.row_submit_date)
-    END AS total_days_pending_from_submission,
+      WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+      WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l1_anm
+      WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l2_anm
+      WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l3_anm
+      WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l4_anm
+      WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l5_anm
+      WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l6_anm
+      WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l7_anm
+      WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l8_anm
+      WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l9_anm
+      WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l10_anm
+    END
 
+  -- No filter + Base PO (original logic)
+  WHEN po_change_order.co_sequence = 0 
+    THEN poapp.previous_approver
+
+  -- No filter + Change Order (original logic)
+  ELSE CASE
+    WHEN wf.l11_anm IS NOT NULL AND wf.l11_anm != wf.l10_anm THEN wf.l10_anm
+    WHEN wf.l10_anm IS NOT NULL AND wf.l10_anm != wf.l9_anm  THEN wf.l9_anm
+    WHEN wf.l9_anm  IS NOT NULL AND wf.l9_anm  != wf.l8_anm  THEN wf.l8_anm
+    WHEN wf.l8_anm  IS NOT NULL AND wf.l8_anm  != wf.l7_anm  THEN wf.l7_anm
+    WHEN wf.l7_anm  IS NOT NULL AND wf.l7_anm  != wf.l6_anm  THEN wf.l6_anm
+    WHEN wf.l6_anm  IS NOT NULL AND wf.l6_anm  != wf.l5_anm  THEN wf.l5_anm
+    WHEN wf.l5_anm  IS NOT NULL AND wf.l5_anm  != wf.l4_anm  THEN wf.l4_anm
+    WHEN wf.l4_anm  IS NOT NULL AND wf.l4_anm  != wf.l3_anm  THEN wf.l3_anm
+    WHEN wf.l3_anm  IS NOT NULL AND wf.l3_anm  != wf.l2_anm  THEN wf.l2_anm
+    WHEN wf.l2_anm  IS NOT NULL AND wf.l2_anm  != wf.l1_anm  THEN wf.l1_anm
+  END
+END AS previous_approver,
+
+
+CASE
+  -- Filter active + Base PO
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.co_sequence = 0 THEN
     CASE
-        WHEN rr.row_status = 'PENDING APPROVAL'
-            THEN NULL
-        WHEN rr.is_change_order = 'YES'
-            THEN TRUNC(coa.selected_approval_dt) - TRUNC(coa.previous_approval_dt)
-        ELSE     TRUNC(bpa.selected_approval_dt) - TRUNC(bpa.previous_approval_dt)
-    END AS total_days_taken_by_selected_approver,
+      WHEN poapp.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+      WHEN poapp.l2_aid  = :P_SELECTED_APPROVER THEN poapp.l1_approved_dt
+      WHEN poapp.l3_aid  = :P_SELECTED_APPROVER THEN poapp.l2_approved_dt
+      WHEN poapp.l4_aid  = :P_SELECTED_APPROVER THEN poapp.l3_approved_dt
+      WHEN poapp.l5_aid  = :P_SELECTED_APPROVER THEN poapp.l4_approved_dt
+      WHEN poapp.l6_aid  = :P_SELECTED_APPROVER THEN poapp.l5_approved_dt
+      WHEN poapp.l7_aid  = :P_SELECTED_APPROVER THEN poapp.l6_approved_dt
+      WHEN poapp.l8_aid  = :P_SELECTED_APPROVER THEN poapp.l7_approved_dt
+      WHEN poapp.l9_aid  = :P_SELECTED_APPROVER THEN poapp.l8_approved_dt
+      WHEN poapp.l10_aid = :P_SELECTED_APPROVER THEN poapp.l9_approved_dt
+      WHEN poapp.l11_aid = :P_SELECTED_APPROVER THEN poapp.l10_approved_dt
+    END
 
+  -- Filter active + Change Order
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.co_sequence > 0 THEN
     CASE
-        WHEN rr.row_status = 'PENDING APPROVAL'
-             AND rr.is_change_order = 'YES'
-             AND coa.selected_approval_dt IS NOT NULL
-            THEN TRUNC(SYSDATE) - TRUNC(coa.selected_approval_dt)
-        WHEN rr.row_status = 'PENDING APPROVAL'
-             AND rr.is_change_order = 'NO'
-             AND bpa.selected_approval_dt IS NOT NULL
-            THEN TRUNC(SYSDATE) - TRUNC(bpa.selected_approval_dt)
-    END AS total_days_pending_from_previous_approver
+      WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+      WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l1_dt
+      WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l2_dt
+      WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l3_dt
+      WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l4_dt
+      WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l5_dt
+      WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l6_dt
+      WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l7_dt
+      WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l8_dt
+      WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l9_dt
+      WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l10_dt
+    END
 
-FROM report_rows rr
-JOIN po_headers_all poh
-    ON poh.po_header_id              = rr.po_header_id
-JOIN po_lines_all pol
-    ON pol.po_header_id              = rr.po_header_id
-   AND pol.line_num                  = 1
-JOIN poz_suppliers_v pos
-    ON pos.vendor_id                 = poh.vendor_id
-JOIN hz_parties hp
-    ON hp.party_id                   = pos.party_id
-JOIN po_distributions_all pod
-    ON pod.po_line_id                = pol.po_line_id
-   AND pod.po_header_id              = pol.po_header_id
-   AND pod.distribution_num          = 1
-JOIN gl_code_combinations gcc
-    ON gcc.code_combination_id       = pod.code_combination_id
-JOIN fun_all_business_units_v fab
-    ON fab.bu_id                     = poh.prc_bu_id
+  -- No filter + Base PO (original logic)
+  WHEN po_change_order.co_sequence = 0 
+    THEN poapp.previous_approval_dt
 
-LEFT JOIN base_po_approval bpa
-    ON bpa.po_header_id              = rr.po_header_id
-   AND bpa.prc_bu_id                 = rr.prc_bu_id
-   AND bpa.segment1                  = rr.segment1
-   AND rr.is_change_order            = 'NO'
-
-LEFT JOIN co_approval coa
-    ON coa.po_header_id              = rr.po_header_id
-   AND coa.co_sequence               = rr.co_sequence
-   AND coa.prc_bu_id                 = rr.prc_bu_id
-   AND coa.segment1                  = rr.segment1
-   AND rr.is_change_order            = 'YES'
-
-LEFT JOIN base_po_pending_approver bpp
-    ON bpp.po_header_id              = rr.po_header_id
-   AND bpp.prc_bu_id                 = rr.prc_bu_id
-   AND bpp.segment1                  = rr.segment1
-   AND rr.is_change_order            = 'NO'
-
-LEFT JOIN co_pending_approver cpa
-    ON cpa.po_header_id              = rr.po_header_id
-   AND cpa.co_sequence               = rr.co_sequence
-   AND cpa.prc_bu_id                 = rr.prc_bu_id
-   AND cpa.segment1                  = rr.segment1
-   AND rr.is_change_order            = 'YES'
-
-WHERE poh.document_status            NOT IN ('CANCELED', 'INCOMPLETE')
-  AND (:p_company_name IS NULL OR fab.bu_id           = :p_company_name)
-  AND rr.row_status                  = NVL(:p_po_status, rr.row_status)
-  AND (:p_start_date IS NULL OR rr.row_creation_date >= :p_start_date)
-  AND (:p_end_date   IS NULL OR rr.row_creation_date  < :p_end_date + 1)
-  AND (
-        :p_selected_approver IS NULL
-        OR (
-            rr.is_change_order = 'NO'  AND bpa.selected_approver_id = :p_selected_approver
-        )
-        OR (
-            rr.is_change_order = 'YES' AND coa.selected_approver_id = :p_selected_approver
-        )
-      )
-ORDER BY
-    rr.po_header_id,
-    NVL(rr.co_sequence, -1)
+  -- No filter + Change Order (original logic)
+  ELSE CASE
+    WHEN wf.l11_dt IS NOT NULL AND wf.l11_dt != wf.l10_dt THEN wf.l10_dt
+    WHEN wf.l10_dt IS NOT NULL AND wf.l10_dt != wf.l9_dt  THEN wf.l9_dt
+    WHEN wf.l9_dt  IS NOT NULL AND wf.l9_dt  != wf.l8_dt  THEN wf.l8_dt
+    WHEN wf.l8_dt  IS NOT NULL AND wf.l8_dt  != wf.l7_dt  THEN wf.l7_dt
+    WHEN wf.l7_dt  IS NOT NULL AND wf.l7_dt  != wf.l6_dt  THEN wf.l6_dt
+    WHEN wf.l6_dt  IS NOT NULL AND wf.l6_dt  != wf.l5_dt  THEN wf.l5_dt
+    WHEN wf.l5_dt  IS NOT NULL AND wf.l5_dt  != wf.l4_dt  THEN wf.l4_dt
+    WHEN wf.l4_dt  IS NOT NULL AND wf.l4_dt  != wf.l3_dt  THEN wf.l3_dt
+    WHEN wf.l3_dt  IS NOT NULL AND wf.l3_dt  != wf.l2_dt  THEN wf.l2_dt
+    WHEN wf.l2_dt  IS NOT NULL AND wf.l2_dt  != wf.l1_dt  THEN wf.l1_dt
+  END
+END AS previous_approval_dt,
