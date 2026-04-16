@@ -69,3 +69,179 @@ AND (
 )
 
 ORDER BY poh.po_header_id, po_change_order.CO_SEQUENCE;
+
+
+
+
+
+
+CASE
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.is_change_order = 'NO' THEN
+    CASE
+      WHEN poapp.l1_aid  = :P_SELECTED_APPROVER THEN NULL  -- nobody before l1
+      WHEN poapp.l2_aid  = :P_SELECTED_APPROVER THEN poapp.l1_approved_by
+      WHEN poapp.l3_aid  = :P_SELECTED_APPROVER THEN poapp.l2_approved_by
+      WHEN poapp.l4_aid  = :P_SELECTED_APPROVER THEN poapp.l3_approved_by
+      WHEN poapp.l5_aid  = :P_SELECTED_APPROVER THEN poapp.l4_approved_by
+      WHEN poapp.l6_aid  = :P_SELECTED_APPROVER THEN poapp.l5_approved_by
+      WHEN poapp.l7_aid  = :P_SELECTED_APPROVER THEN poapp.l6_approved_by
+      WHEN poapp.l8_aid  = :P_SELECTED_APPROVER THEN poapp.l7_approved_by
+      WHEN poapp.l9_aid  = :P_SELECTED_APPROVER THEN poapp.l8_approved_by
+      WHEN poapp.l10_aid = :P_SELECTED_APPROVER THEN poapp.l9_approved_by
+      WHEN poapp.l11_aid = :P_SELECTED_APPROVER THEN poapp.l10_approved_by
+    END
+
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.is_change_order = 'YES' THEN
+    CASE
+      WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+      WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l1_anm
+      WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l2_anm
+      WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l3_anm
+      WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l4_anm
+      WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l5_anm
+      WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l6_anm
+      WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l7_anm
+      WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l8_anm
+      WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l9_anm
+      WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l10_anm
+    END
+
+  -- existing logic unchanged
+  ELSE poapp.previous_approver
+END AS previous_approver,
+
+
+CASE
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.is_change_order = 'NO' THEN
+    CASE
+      WHEN poapp.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+      WHEN poapp.l2_aid  = :P_SELECTED_APPROVER THEN poapp.l1_approved_dt
+      WHEN poapp.l3_aid  = :P_SELECTED_APPROVER THEN poapp.l2_approved_dt
+      WHEN poapp.l4_aid  = :P_SELECTED_APPROVER THEN poapp.l3_approved_dt
+      WHEN poapp.l5_aid  = :P_SELECTED_APPROVER THEN poapp.l4_approved_dt
+      WHEN poapp.l6_aid  = :P_SELECTED_APPROVER THEN poapp.l5_approved_dt
+      WHEN poapp.l7_aid  = :P_SELECTED_APPROVER THEN poapp.l6_approved_dt
+      WHEN poapp.l8_aid  = :P_SELECTED_APPROVER THEN poapp.l7_approved_dt
+      WHEN poapp.l9_aid  = :P_SELECTED_APPROVER THEN poapp.l8_approved_dt
+      WHEN poapp.l10_aid = :P_SELECTED_APPROVER THEN poapp.l9_approved_dt
+      WHEN poapp.l11_aid = :P_SELECTED_APPROVER THEN poapp.l10_approved_dt
+    END
+
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.is_change_order = 'YES' THEN
+    CASE
+      WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN NULL
+      WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l1_dt
+      WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l2_dt
+      WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l3_dt
+      WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l4_dt
+      WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l5_dt
+      WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l6_dt
+      WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l7_dt
+      WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l8_dt
+      WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l9_dt
+      WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l10_dt
+    END
+
+  -- existing logic unchanged
+  ELSE poapp.previous_approval_dt
+END AS previous_approval_dt,
+
+
+
+CASE
+  -- ✅ When filter is active - NO change order
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.is_change_order = 'NO' THEN
+    CASE
+      WHEN poapp.l1_aid  = :P_SELECTED_APPROVER THEN poapp.l1_approved_dt
+      WHEN poapp.l2_aid  = :P_SELECTED_APPROVER THEN poapp.l2_approved_dt
+      WHEN poapp.l3_aid  = :P_SELECTED_APPROVER THEN poapp.l3_approved_dt
+      WHEN poapp.l4_aid  = :P_SELECTED_APPROVER THEN poapp.l4_approved_dt
+      WHEN poapp.l5_aid  = :P_SELECTED_APPROVER THEN poapp.l5_approved_dt
+      WHEN poapp.l6_aid  = :P_SELECTED_APPROVER THEN poapp.l6_approved_dt
+      WHEN poapp.l7_aid  = :P_SELECTED_APPROVER THEN poapp.l7_approved_dt
+      WHEN poapp.l8_aid  = :P_SELECTED_APPROVER THEN poapp.l8_approved_dt
+      WHEN poapp.l9_aid  = :P_SELECTED_APPROVER THEN poapp.l9_approved_dt
+      WHEN poapp.l10_aid = :P_SELECTED_APPROVER THEN poapp.l10_approved_dt
+      WHEN poapp.l11_aid = :P_SELECTED_APPROVER THEN poapp.l11_approved_dt
+    END
+
+  -- ✅ When filter is active - YES change order
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.is_change_order = 'YES' THEN
+    CASE
+      WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN wf.l1_dt
+      WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l2_dt
+      WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l3_dt
+      WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l4_dt
+      WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l5_dt
+      WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l6_dt
+      WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l7_dt
+      WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l8_dt
+      WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l9_dt
+      WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l10_dt
+      WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l11_dt
+    END
+
+  -- ✅ No filter - existing logic unchanged
+  WHEN po_change_order.co_sequence = 0 
+    THEN poapp.selected_approval_dt
+  ELSE COALESCE(wf.l11_dt, wf.l10_dt, wf.l9_dt, wf.l8_dt,
+                wf.l7_dt, wf.l6_dt, wf.l5_dt, wf.l4_dt,
+                wf.l3_dt, wf.l2_dt, wf.l1_dt)
+END AS selected_approval_dt,
+
+
+
+CASE
+  -- ✅ ADD THIS BLOCK FIRST
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.is_change_order = 'NO' THEN
+    CASE
+      WHEN poapp.l1_aid  = :P_SELECTED_APPROVER THEN poapp.l1_approved_by
+      WHEN poapp.l2_aid  = :P_SELECTED_APPROVER THEN poapp.l2_approved_by
+      WHEN poapp.l3_aid  = :P_SELECTED_APPROVER THEN poapp.l3_approved_by
+      WHEN poapp.l4_aid  = :P_SELECTED_APPROVER THEN poapp.l4_approved_by
+      WHEN poapp.l5_aid  = :P_SELECTED_APPROVER THEN poapp.l5_approved_by
+      WHEN poapp.l6_aid  = :P_SELECTED_APPROVER THEN poapp.l6_approved_by
+      WHEN poapp.l7_aid  = :P_SELECTED_APPROVER THEN poapp.l7_approved_by
+      WHEN poapp.l8_aid  = :P_SELECTED_APPROVER THEN poapp.l8_approved_by
+      WHEN poapp.l9_aid  = :P_SELECTED_APPROVER THEN poapp.l9_approved_by
+      WHEN poapp.l10_aid = :P_SELECTED_APPROVER THEN poapp.l10_approved_by
+      WHEN poapp.l11_aid = :P_SELECTED_APPROVER THEN poapp.l11_approved_by
+    END
+
+  WHEN :P_SELECTED_APPROVER IS NOT NULL 
+   AND po_change_order.is_change_order = 'YES' THEN
+    CASE
+      WHEN wf.l1_aid  = :P_SELECTED_APPROVER THEN wf.l1_anm
+      WHEN wf.l2_aid  = :P_SELECTED_APPROVER THEN wf.l2_anm
+      WHEN wf.l3_aid  = :P_SELECTED_APPROVER THEN wf.l3_anm
+      WHEN wf.l4_aid  = :P_SELECTED_APPROVER THEN wf.l4_anm
+      WHEN wf.l5_aid  = :P_SELECTED_APPROVER THEN wf.l5_anm
+      WHEN wf.l6_aid  = :P_SELECTED_APPROVER THEN wf.l6_anm
+      WHEN wf.l7_aid  = :P_SELECTED_APPROVER THEN wf.l7_anm
+      WHEN wf.l8_aid  = :P_SELECTED_APPROVER THEN wf.l8_anm
+      WHEN wf.l9_aid  = :P_SELECTED_APPROVER THEN wf.l9_anm
+      WHEN wf.l10_aid = :P_SELECTED_APPROVER THEN wf.l10_anm
+      WHEN wf.l11_aid = :P_SELECTED_APPROVER THEN wf.l11_anm
+    END
+
+  -- Existing logic (no filter case)
+  WHEN po_change_order.co_sequence = 0 
+    THEN poapp.selected_approver
+  ELSE COALESCE(wf.l11_anm, wf.l10_anm, wf.l9_anm, wf.l8_anm,
+                wf.l7_anm, wf.l6_anm, wf.l5_anm, wf.l4_anm,
+                wf.l3_anm, wf.l2_anm, wf.l1_anm)
+END AS selected_approver,
+
+
+
+
+
+
+
