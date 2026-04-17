@@ -112,3 +112,187 @@ AND (
     )
   )
 )
+
+
+
+
+
+
+
+
+PO_APPROVAL AS (
+  SELECT 
+    po_header_id,
+    prc_bu_id,
+    segment1,
+    -- Approver columns
+    MAX(CASE WHEN seq = 1  THEN approver_id END) AS l1_aid,
+    MAX(CASE WHEN seq = 1  THEN approver END)    AS l1_approved_by,
+    MAX(CASE WHEN seq = 1  THEN approved_dt END) AS l1_approved_dt,
+    MAX(CASE WHEN seq = 1  THEN a_note END)      AS l1_a_nte,
+    
+    MAX(CASE WHEN seq = 2  THEN approver_id END) AS l2_aid,
+    MAX(CASE WHEN seq = 2  THEN approver END)    AS l2_approved_by,
+    MAX(CASE WHEN seq = 2  THEN approved_dt END) AS l2_approved_dt,
+    MAX(CASE WHEN seq = 2  THEN a_note END)      AS l2_a_nte,
+    
+    MAX(CASE WHEN seq = 3  THEN approver_id END) AS l3_aid,
+    MAX(CASE WHEN seq = 3  THEN approver END)    AS l3_approved_by,
+    MAX(CASE WHEN seq = 3  THEN approved_dt END) AS l3_approved_dt,
+    MAX(CASE WHEN seq = 3  THEN a_note END)      AS l3_a_nte,
+    
+    MAX(CASE WHEN seq = 4  THEN approver_id END) AS l4_aid,
+    MAX(CASE WHEN seq = 4  THEN approver END)    AS l4_approved_by,
+    MAX(CASE WHEN seq = 4  THEN approved_dt END) AS l4_approved_dt,
+    MAX(CASE WHEN seq = 4  THEN a_note END)      AS l4_a_nte,
+    
+    MAX(CASE WHEN seq = 5  THEN approver_id END) AS l5_aid,
+    MAX(CASE WHEN seq = 5  THEN approver END)    AS l5_approved_by,
+    MAX(CASE WHEN seq = 5  THEN approved_dt END) AS l5_approved_dt,
+    MAX(CASE WHEN seq = 5  THEN a_note END)      AS l5_a_nte,
+    
+    MAX(CASE WHEN seq = 6  THEN approver_id END) AS l6_aid,
+    MAX(CASE WHEN seq = 6  THEN approver END)    AS l6_approved_by,
+    MAX(CASE WHEN seq = 6  THEN approved_dt END) AS l6_approved_dt,
+    MAX(CASE WHEN seq = 6  THEN a_note END)      AS l6_a_nte,
+    
+    MAX(CASE WHEN seq = 7  THEN approver_id END) AS l7_aid,
+    MAX(CASE WHEN seq = 7  THEN approver END)    AS l7_approved_by,
+    MAX(CASE WHEN seq = 7  THEN approved_dt END) AS l7_approved_dt,
+    MAX(CASE WHEN seq = 7  THEN a_note END)      AS l7_a_nte,
+    
+    MAX(CASE WHEN seq = 8  THEN approver_id END) AS l8_aid,
+    MAX(CASE WHEN seq = 8  THEN approver END)    AS l8_approved_by,
+    MAX(CASE WHEN seq = 8  THEN approved_dt END) AS l8_approved_dt,
+    MAX(CASE WHEN seq = 8  THEN a_note END)      AS l8_a_nte,
+    
+    MAX(CASE WHEN seq = 9  THEN approver_id END) AS l9_aid,
+    MAX(CASE WHEN seq = 9  THEN approver END)    AS l9_approved_by,
+    MAX(CASE WHEN seq = 9  THEN approved_dt END) AS l9_approved_dt,
+    MAX(CASE WHEN seq = 9  THEN a_note END)      AS l9_a_nte,
+    
+    MAX(CASE WHEN seq = 10 THEN approver_id END) AS l10_aid,
+    MAX(CASE WHEN seq = 10 THEN approver END)    AS l10_approved_by,
+    MAX(CASE WHEN seq = 10 THEN approved_dt END) AS l10_approved_dt,
+    MAX(CASE WHEN seq = 10 THEN a_note END)      AS l10_a_nte,
+    
+    MAX(CASE WHEN seq = 11 THEN approver_id END) AS l11_aid,
+    MAX(CASE WHEN seq = 11 THEN approver END)    AS l11_approved_by,
+    MAX(CASE WHEN seq = 11 THEN approved_dt END) AS l11_approved_dt,
+    MAX(CASE WHEN seq = 11 THEN a_note END)      AS l11_a_nte,
+    
+    -- Computed columns
+    COALESCE(
+      MAX(CASE WHEN seq = 11 THEN approver_id END),
+      MAX(CASE WHEN seq = 10 THEN approver_id END),
+      MAX(CASE WHEN seq = 9  THEN approver_id END),
+      MAX(CASE WHEN seq = 8  THEN approver_id END),
+      MAX(CASE WHEN seq = 7  THEN approver_id END),
+      MAX(CASE WHEN seq = 6  THEN approver_id END),
+      MAX(CASE WHEN seq = 5  THEN approver_id END),
+      MAX(CASE WHEN seq = 4  THEN approver_id END),
+      MAX(CASE WHEN seq = 3  THEN approver_id END),
+      MAX(CASE WHEN seq = 2  THEN approver_id END),
+      MAX(CASE WHEN seq = 1  THEN approver_id END)
+    ) AS selected_approver_id,
+    
+    COALESCE(
+      MAX(CASE WHEN seq = 11 THEN approver END),
+      MAX(CASE WHEN seq = 10 THEN approver END),
+      MAX(CASE WHEN seq = 9  THEN approver END),
+      MAX(CASE WHEN seq = 8  THEN approver END),
+      MAX(CASE WHEN seq = 7  THEN approver END),
+      MAX(CASE WHEN seq = 6  THEN approver END),
+      MAX(CASE WHEN seq = 5  THEN approver END),
+      MAX(CASE WHEN seq = 4  THEN approver END),
+      MAX(CASE WHEN seq = 3  THEN approver END),
+      MAX(CASE WHEN seq = 2  THEN approver END),
+      MAX(CASE WHEN seq = 1  THEN approver END)
+    ) AS selected_approver,
+    
+    COALESCE(
+      MAX(CASE WHEN seq = 11 THEN approved_dt END),
+      MAX(CASE WHEN seq = 10 THEN approved_dt END),
+      MAX(CASE WHEN seq = 9  THEN approved_dt END),
+      MAX(CASE WHEN seq = 8  THEN approved_dt END),
+      MAX(CASE WHEN seq = 7  THEN approved_dt END),
+      MAX(CASE WHEN seq = 6  THEN approved_dt END),
+      MAX(CASE WHEN seq = 5  THEN approved_dt END),
+      MAX(CASE WHEN seq = 4  THEN approved_dt END),
+      MAX(CASE WHEN seq = 3  THEN approved_dt END),
+      MAX(CASE WHEN seq = 2  THEN approved_dt END),
+      MAX(CASE WHEN seq = 1  THEN approved_dt END)
+    ) AS selected_approval_dt,
+    
+    -- Previous approver logic (simplified - will add CASE in main query)
+    NULL AS previous_approver,
+    NULL AS previous_approval_dt
+    
+  FROM (
+    SELECT 
+      po_header_id,
+      prc_bu_id,
+      segment1,
+      approver_id,
+      approver,
+      a_note,
+      approved_dt,
+      ROW_NUMBER() OVER (
+        PARTITION BY po_header_id
+        ORDER BY approved_dt
+      ) AS seq
+    FROM (
+      -- ✅ Get all approvals from BOTH sources
+      SELECT DISTINCT
+        poh.po_header_id,
+        poh.prc_bu_id,
+        poh.segment1,
+        pu.person_id AS approver_id,
+        pea.email_address AS approver,
+        NULL AS a_note,
+        fwh.updateddate AS approved_dt
+      FROM po_headers_all poh
+      JOIN po_versions pov
+        ON pov.po_header_id = poh.po_header_id
+      JOIN fa_fusion_soainfra.wftaskhistory fwh
+        ON fwh.compositeinstanceid = pov.approval_instance_id
+      JOIN per_users pu
+        ON pu.username = fwh.updatedby
+      JOIN per_email_addresses pea
+        ON pea.person_id = pu.person_id
+      WHERE fwh.state = 'OUTCOME_UPDATED'
+        AND fwh.outcome = 'APPROVE'
+        AND fwh.updatedby != 'workflowsystem'
+        AND NVL(pov.co_sequence, 0) = 0
+        AND pov.approval_instance_id IS NOT NULL
+      
+      UNION
+      
+      SELECT DISTINCT
+        pha.po_header_id,
+        pha.prc_bu_id,
+        pha.segment1,
+        pah.performer_id AS approver_id,
+        pea.email_address AS approver,
+        CAST(REPLACE(REPLACE(NVL(patc.user_comment,''),
+             CHR(9),''),CHR(10),'') AS VARCHAR2(500)) AS a_note,
+        pah.action_date AS approved_dt
+      FROM po_action_history pah
+      JOIN po_headers_all pha
+        ON pha.po_header_id = pah.object_id
+      JOIN po_versions pov
+        ON pov.version_id = pah.po_version_id
+        AND pov.po_header_id = pah.object_id
+      JOIN per_email_addresses pea
+        ON pea.person_id = pah.performer_id
+      LEFT JOIN por_approval_task_comments patc
+        ON patc.object_id = pah.object_id
+        AND patc.performer_id = pah.performer_id
+        AND patc.identification_key = pah.identification_key
+      WHERE pah.action_code = 'APPROVE'
+        AND pah.performer_id IS NOT NULL
+        AND NVL(pov.co_sequence, 0) = 0
+    )
+  )
+  GROUP BY po_header_id, prc_bu_id, segment1
+)
