@@ -600,6 +600,66 @@ WHERE poh.document_status            NOT IN ('CANCELED', 'INCOMPLETE')
   AND (:p_end_date   IS NULL OR rr.row_creation_date  < :p_end_date + 1)
   AND (
         :p_selected_approver IS NULL
+
+
+
+
+IMG_20260417_185736.jpg
+IMG_20260417_185756.jpg
+IMG_20260417_185807.jpg
+IMG_20260417_185842.jpg
+IMG_20260417_185908.jpg
+IMG_20260417_185925.jpg
+IMG_20260417_185953.jpg
+IMG_20260417_190006.jpg
+IMG_20260417_190015.jpg
+IMG_20260417_190025.jpg
+IMG_20260417_190036.jpg
+
+So in this code for all pos each cycles are getting repeated it has to provide only the max cycle details for base and max cycle details for change order po so what I mean is 
+For one particular po if has gone through change then in output i should have one row of that po with base po and one with change order po
+If no change order then that po has to provide only one row 
+
+Like wise another problem is 
+ suppose lets have a po number 123
+
+if this po has 5 levis of approvers it should display this po in all levels of approver is selected in selected approver parameter filter
+
+but what happens here this po123 header status is pending approval
+
+so 1st level approver joy
+
+2nd level igor
+
+3rd level moshood
+
+4th level wallace
+
+5th level pending with sachin
+
+so inthe case if i select wallace in filter
+
+this po is displayed with wallace as selected approver, moshood as previous approver and pending with sachin
+
+like wise i select moshood as selected appprover in filter
+
+this po is displayed with moshood as slected approver ans sachin as pending with but igor is not displayed as previous
+
+approver in this case previous approver is shown as null
+
+like wise if i select igor or joey in filter i could not find this po number in report output
+
+why?
+
+
+
+
+
+
+
+
+
+
         OR (rr.is_change_order = 'NO'  AND bpa.selected_approver_id = :p_selected_approver)
         OR (rr.is_change_order = 'YES' AND coa.selected_approver_id = :p_selected_approver)
       )
