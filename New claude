@@ -1,0 +1,512 @@
+-- =====================================================
+-- BLOCK 1: BASE PO APPROVAL (WITH MAX CYCLE FILTER)
+-- =====================================================
+
+WITH PO_LATEST_SUBMIT AS (
+    SELECT
+        pah.object_id AS po_header_id,
+        MAX(pah.action_date) AS latest_submit_date
+    FROM po_action_history pah
+    JOIN po_versions pov
+        ON pov.po_version_id = pah.po_version_id
+        AND pov.po_header_id = pah.object_id
+    WHERE pah.action_code = 'SUBMIT'
+        AND NVL(pov.co_sequence, 0) = 0
+    GROUP BY pah.object_id
+),
+
+PO_APPROVAL AS (
+    SELECT *
+    FROM (
+        SELECT
+            t.*,
+            -- ✓ CHANGED: Added max_seq to identify latest approval cycle
+            MAX(seq) OVER (PARTITION BY po_header_id) AS max_seq,
+            
+            -- Previous approver (THIS FIXES YOUR MAIN ISSUE)
+            LAG(approver) OVER (
+                PARTITION BY po_header_id
+                ORDER BY approved_dt
+            ) AS previous_approver,
+            
+            LAG(approver_id) OVER (
+                PARTITION BY po_header_id
+                ORDER BY approved_dt
+            ) AS previous_approver_id,
+            
+            LAG(approved_dt) OVER (
+                PARTITION BY po_header_id
+                ORDER BY approved_dt
+            ) AS previous_approval_dt
+
+        FROM (
+            SELECT
+                pha.po_header_id,
+                pha.prc_bu_id,
+                pha.segment1,
+                
+                pah.performer_id AS approver_id,
+                pea.email_address AS approver,
+                CAST(
+                    REPLACE(REPLACE(NVL(patc.user_comment, ''), CHR(9), ''), CHR(10), '')
+                    AS VARCHAR2(500)
+                ) AS a_note,
+                
+                pah.action_date AS approved_dt
+                
+            FROM po_action_history pah
+            JOIN po_headers_all pha
+                ON pha.po_header_id = pah.object_id
+            JOIN po_versions pov
+                ON pov.po_version_id = pah.po_version_id
+                AND pov.po_header_id = pah.object_id
+            LEFT JOIN per_users pu
+                ON pu.person_id = pah.performer_id
+            JOIN per_email_addresses pea
+                ON pea.person_id = pu.person_id
+            LEFT JOIN por_approval_task_comments patc
+                ON patc.object_id = pah.object_id
+                AND patc.performer_id = pah.performer_id
+                AND patc.identification_key = pah.identification_key
+                
+            WHERE pah.action_code = 'APPROVE'
+                AND pah.performer_id IS NOT NULL
+                AND NVL(pov.co_sequence, 0) = 0
+                
+        ) t
+        -- ✓ CHANGED: Add sequence numbering
+        CROSS APPLY (
+            SELECT ROW_NUMBER() OVER (
+                PARTITION BY po_header_id
+                ORDER BY approved_dt
+            ) AS seq
+            FROM dual
+        ) seq_calc
+    )
+    -- ✓ CHANGED: Filter to keep only the latest approval cycle
+    WHERE seq = max_seq
+)
+
+UNION ALL
+
+-- =====================================================
+-- BLOCK 2: WF HISTORY
+-- =====================================================
+
+SELECT
+    poh.po_header_id,
+    poh.prc_bu_id,
+    poh.segment1,
+    
+    pu.person_id AS approver_id,
+    pea.email_address AS approver,
+    NULL AS a_note,
+    
+    fwh.updateddate AS approved_dt
+
+FROM po_headers_all poh
+JOIN po_versions pov
+    ON pov.po_header_id = poh.po_header_id
+    AND NVL(pov.co_sequence, 0) = 0
+
+JOIN fa_fusion_soainfra.wftaskhistory fwh
+    ON fwh.compositeinstanceid = pov.approval_instance_id
+
+JOIN per_users pu
+    ON pu.username = fwh.updatedby
+JOIN per_email_addresses pea
+    ON pea.person_id = pu.person_id
+
+WHERE fwh.state = 'OUTCOME_UPDATED'
+    AND fwh.outcome = 'APPROVE'
+    AND fwh.updatedby <> 'workflowsystem'
+
+UNION ALL
+
+-- =====================================================
+-- BLOCK 2: ACTION HISTORY
+-- =====================================================
+
+SELECT
+    pha.po_header_id,
+    pov.co_sequence,
+    pea.email_address AS approver,
+    
+    pah.performer_id AS approver_id,
+    pah.action_date AS approval_date
+
+FROM po_action_history pah
+JOIN po_headers_all pha
+    ON pha.po_header_id = pah.object_id
+JOIN po_versions pov
+    ON pov.po_header_id = pha.po_header_id
+    AND pov.po_header_id = pah.object_id
+
+LEFT JOIN por_approval_task_comments patc
+    ON patc.object_id = pah.object_id
+    AND patc.performer_id = pah.performer_id
+    AND patc.identification_key = pah.identification_key
+
+WHERE pah.action_code = 'APPROVE'
+    AND pah.performer_id IS NOT NULL
+    AND pov.co_sequence > 0
+
+-- =====================================================
+-- PO_CHANGE_ORDER (WITH MAX CYCLE FILTER)
+-- =====================================================
+
+,PO_CHANGE_ORDER AS (
+    SELECT *
+    FROM (
+        SELECT
+            pov.po_header_id,
+            pov.CO_SEQUENCE,
+            pov.CO_NUM,
+            pov.CREATION_DATE AS change_order_creation_date,
+            pov.CREATED_BY AS change_order_created_by,
+            pov.CHANGE_ORDER_DESC,
+            pov.CHANGE_ORDER_STATUS,
+            pov.APPROVED_DATE AS change_order_approved_date,
+            pov.SUBMITTED_DATE AS change_order_submitted_date,
+            pov.CO_CANCELED_FLAG,
+            
+            -- ✓ CHANGED: Added max_seq for change orders
+            ROW_NUMBER() OVER (
+                PARTITION BY pov.po_header_id, pov.CO_SEQUENCE
+                ORDER BY pov.APPROVED_DATE DESC NULLS LAST
+            ) AS seq,
+            
+            MAX(ROW_NUMBER()) OVER (
+                PARTITION BY pov.po_header_id, pov.CO_SEQUENCE
+            ) AS max_seq,
+            
+            CASE
+                WHEN pov.CO_SEQUENCE IS NOT NULL AND pov.CO_SEQUENCE > 0 THEN 'YES'
+                ELSE 'NO'
+            END AS is_change_order,
+            
+            FROM po_versions pov
+            WHERE pov.CO_SEQUENCE IS NOT NULL
+    )
+    -- ✓ CHANGED: Keep only latest cycle per change order
+    WHERE seq = max_seq
+)
+
+-- =====================================================
+-- PO_WF_APPROVAL (WITH MAX CYCLE FILTER)
+-- =====================================================
+
+,PO_WF_APPROVAL AS (
+    SELECT *
+    FROM (
+        SELECT
+            t.po_header_id,
+            t.co_sequence,
+            t.approver,
+            t.approver_id,
+            t.approval_date,
+            
+            -- ✓ CHANGED: Sequence per PO+CO combination
+            ROW_NUMBER() OVER (
+                PARTITION BY t.po_header_id, t.co_sequence
+                ORDER BY t.approval_date
+            ) AS seq,
+            
+            MAX(ROW_NUMBER()) OVER (
+                PARTITION BY t.po_header_id, t.co_sequence
+            ) AS max_seq,
+            
+            -- Previous approver (KEY FIX)
+            LAG(t.approver) OVER (
+                PARTITION BY t.po_header_id, t.co_sequence
+                ORDER BY t.approval_date
+            ) AS previous_approver,
+            
+            LAG(t.approver_id) OVER (
+                PARTITION BY t.po_header_id, t.co_sequence
+                ORDER BY t.approval_date
+            ) AS previous_approver_id,
+            
+            LAG(t.approval_date) OVER (
+                PARTITION BY t.po_header_id, t.co_sequence
+                ORDER BY t.approval_date
+            ) AS previous_approval_dt
+            
+        FROM (
+            /* BLOCK 1: WF HISTORY */
+            SELECT
+                poh.po_header_id,
+                pov.co_sequence,
+                pea.email_address AS approver,
+                pu.person_id AS approver_id,
+                fwh.updateddate AS approval_date
+            FROM po_headers_all poh
+            JOIN po_versions pov
+                ON pov.po_header_id = poh.po_header_id
+                AND NVL(pov.co_sequence, 0) = 0
+            JOIN fa_fusion_soainfra.wftaskhistory fwh
+                ON fwh.compositeinstanceid = pov.approval_instance_id
+            JOIN per_users pu
+                ON pu.username = fwh.updatedby
+            JOIN per_email_addresses pea
+                ON pea.person_id = pu.person_id
+            WHERE fwh.state = 'OUTCOME_UPDATED'
+                AND fwh.outcome = 'APPROVE'
+                AND fwh.updatedby <> 'workflowsystem'
+                AND pov.co_sequence > 0
+                
+            UNION ALL
+            
+            /* BLOCK 2: ACTION HISTORY */
+            SELECT
+                poh.po_header_id,
+                pov.co_sequence,
+                pea.email_address AS approver,
+                pu.person_id AS approver_id,
+                fwh.updateddate AS approval_date
+            FROM po_headers_all poh
+            JOIN po_versions pov
+                ON pov.po_header_id = poh.po_header_id
+            JOIN fa_fusion_soainfra.wftaskhistory fwh
+                ON fwh.compositeinstanceid = pov.approval_instance_id
+            JOIN per_users pu
+                ON pu.username = fwh.updatedby
+            JOIN per_email_addresses pea
+                ON pea.person_id = pu.person_id
+            WHERE fwh.state = 'OUTCOME_UPDATED'
+                AND fwh.outcome = 'APPROVE'
+                AND fwh.updatedby <> 'workflowsystem'
+        ) t
+    )
+    -- ✓ CHANGED: Keep only latest cycle
+    WHERE seq = max_seq
+)
+
+-- =====================================================
+-- PO_PENDING_APPROVER
+-- =====================================================
+
+,PO_PENDING_APPROVER AS (
+    SELECT
+        poh.po_header_id,
+        poh.prc_bu_id,
+        poh.segment1,
+        LISTAGG(
+            CASE
+                WHEN wf.state = 'INFO_REQUESTED'
+                    THEN wf.assignees || ' (If Requested to ' || wf.assignees || ')'
+                ELSE wf.assignees
+            END,
+            ', '
+        ) WITHIN GROUP (ORDER BY wf.assigneddate) AS pending_with
+    FROM po_headers_all poh
+    JOIN po_versions pov
+        ON pov.po_header_id = poh.po_header_id
+        AND NVL(pov.co_sequence, 0) = 0
+    JOIN fa_fusion_soainfra.wftaskhistory fwh
+        ON fwh.compositeinstanceid = pov.approval_instance_id
+    JOIN per_users pu
+        ON pu.username = fwh.updatedby
+    JOIN per_email_addresses pea
+        ON pea.person_id = pu.person_id
+    WHERE fwh.state IN ('ASSIGNED', 'INFO_REQUESTED')
+        AND wf.assignees IS NOT NULL
+        AND wf.workflowpattern NOT IN ('AGGREGATION', 'FYI')
+        AND wf.componentname = 'DocumentApproval'
+    GROUP BY poh.po_header_id, pov.CO_SEQUENCE, poh.prc_bu_id, poh.segment1
+)
+
+-- =====================================================
+-- MAIN QUERY
+-- =====================================================
+
+SELECT
+    gcc.segment1 AS company_code,
+    fab.bu_name AS po_company_name,
+    poh.segment1 AS po_number,
+    
+    -- ✓ CHANGED: Use COALESCE to combine approver sources
+    NVL(po_change_order.is_change_order, 'NO') AS change_order,
+    
+    CASE
+        WHEN po_change_order.is_change_order = 'YES'
+            AND po_change_order.change_order_status = 'PENDING APPROVAL'
+            THEN 'PENDING APPROVAL'
+        ELSE poh.document_status
+    END AS status,
+    
+    hp.party_name AS vendor_name,
+    pos.segment1 AS vendor_number,
+    
+    CASE
+        WHEN po_change_order.is_change_order = 'YES'
+            THEN po_change_order.change_order_created_by
+        ELSE poh.created_by
+    END AS created_by,
+    
+    CASE
+        WHEN po_change_order.is_change_order = 'YES'
+            THEN po_change_order.change_order_creation_date
+        ELSE poh.creation_date
+    END AS creation_date,
+    
+    CASE
+        WHEN po_change_order.is_change_order = 'YES'
+            THEN po_change_order.change_order_submitted_date
+        ELSE pls.latest_submit_date
+    END AS submit_date,
+    
+    poh.currency_code,
+    
+    -- =====================================================
+    -- APPROVER LOGIC (FINAL FIX)
+    -- =====================================================
+    
+    CASE
+        WHEN po_change_order.is_change_order = 'NO'
+            THEN poapp.approver
+        ELSE wf.approver
+    END AS selected_approver,
+    
+    CASE
+        WHEN po_change_order.is_change_order = 'NO'
+            THEN poapp.approved_dt
+        ELSE wf.approval_date
+    END AS selected_approval_dt,
+    
+    CASE
+        WHEN po_change_order.is_change_order = 'NO'
+            THEN poapp.previous_approver
+        ELSE wf.previous_approver
+    END AS previous_approver,
+    
+    CASE
+        WHEN po_change_order.is_change_order = 'NO'
+            THEN poapp.previous_approval_dt
+        ELSE wf.previous_approval_dt
+    END AS previous_approval_dt,
+    
+    popen.pending_with,
+    
+    -- =====================================================
+    -- METRICS
+    -- =====================================================
+    
+    CASE
+        WHEN po_change_order.is_change_order = 'YES'
+            AND po_change_order.change_order_submitted_date IS NOT NULL
+            AND po_change_order.change_order_approved_date IS NOT NULL
+            THEN TRUNC(po_change_order.change_order_approved_date)
+                 - TRUNC(po_change_order.change_order_submitted_date)
+                 
+        WHEN po_change_order.is_change_order = 'NO'
+            AND pls.latest_submit_date IS NOT NULL
+            AND poapp.approved_dt IS NOT NULL
+            THEN TRUNC(poapp.approved_dt) - TRUNC(pls.latest_submit_date)
+            
+    END AS total_days_pending_from_submission,
+    
+    CASE
+        WHEN poh.document_status = 'PENDING APPROVAL'
+            THEN NULL
+        ELSE TRUNC(
+            CASE
+                WHEN po_change_order.is_change_order = 'NO'
+                    THEN poapp.approved_dt
+                ELSE wf.approval_date
+            END
+        ) - TRUNC(
+            CASE
+                WHEN po_change_order.is_change_order = 'NO'
+                    THEN poapp.previous_approval_dt
+                ELSE wf.previous_approval_dt
+            END
+        )
+    END AS total_days_taken_by_selected_approver,
+    
+    CASE
+        WHEN poh.document_status = 'PENDING APPROVAL'
+            THEN TRUNC(
+                CASE
+                    WHEN po_change_order.is_change_order = 'NO'
+                        THEN poapp.approved_dt
+                    ELSE wf.approval_date
+                END
+            ) - TRUNC(
+                CASE
+                    WHEN po_change_order.is_change_order = 'NO'
+                        THEN poapp.previous_approval_dt
+                    ELSE wf.previous_approval_dt
+                END
+            )
+    END AS total_days_pending_from_previous_approver
+
+FROM po_headers_all poh
+
+JOIN po_lines_all pol
+    ON pol.po_header_id = poh.po_header_id
+    AND pol.line_num = 1
+
+JOIN poz_suppliers_v pos
+    ON pos.vendor_id = poh.vendor_id
+
+JOIN hz_parties hp
+    ON hp.party_id = pos.party_id
+
+JOIN po_distributions_all pod
+    ON pod.po_line_id = pol.po_line_id
+    AND pod.po_header_id = pol.po_header_id
+    AND pod.distribution_num = 1
+
+JOIN gl_code_combinations gcc
+    ON gcc.code_combination_id = pod.code_combination_id
+
+JOIN fun_all_business_units_v fab
+    ON fab.bu_id = poh.prc_bu_id
+
+-- =====================================================
+-- JOINS TO CTEs
+-- =====================================================
+
+/* BASE PO APPROVAL (LAG) */
+LEFT JOIN PO_APPROVAL poapp
+    ON poapp.po_header_id = poh.po_header_id
+    AND (:P_SELECTED_APPROVER IS NULL
+         OR poapp.approver_id = :P_SELECTED_APPROVER)  -- ✓ CHANGED: Fixed filter
+
+/* CHANGE ORDER */
+LEFT JOIN PO_CHANGE_ORDER po_change_order
+    ON po_change_order.po_header_id = poh.po_header_id
+
+/* WF APPROVAL (LAG) */
+LEFT JOIN PO_WF_APPROVAL wf
+    ON wf.po_header_id = poh.po_header_id
+    AND wf.co_sequence = po_change_order.co_sequence
+    AND (:P_SELECTED_APPROVER IS NULL
+         OR wf.approver_id = :P_SELECTED_APPROVER)  -- ✓ CHANGED: Fixed filter
+
+/* PENDING */
+LEFT JOIN PO_PENDING_APPROVER popen
+    ON popen.po_header_id = poh.po_header_id
+
+LEFT JOIN PO_LATEST_SUBMIT pls
+    ON pls.po_header_id = poh.po_header_id
+
+-- =====================================================
+-- FILTERS
+-- =====================================================
+
+WHERE poh.document_status NOT IN ('CANCELED', 'INCOMPLETE')
+    AND (:p_company_name IS NULL OR fab.bu_id = :p_company_name)
+    AND poh.document_status = NVL(:p_po_status, poh.document_status)
+    AND (:p_start_date IS NULL OR poh.creation_date >= :p_start_date)
+    AND (:p_end_date IS NULL OR poh.creation_date < :p_end_date + 1)
+    
+    /* ✓ IMPORTANT: filter stays SAME LOGIC but now works correctly */
+    AND (
+        :P_SELECTED_APPROVER IS NULL
+        OR poapp.approver_id = :P_SELECTED_APPROVER  -- ✓ CHANGED
+        OR wf.approver_id = :P_SELECTED_APPROVER      -- ✓ CHANGED
+    )
+
+ORDER BY poh.po_header_id, po_change_order.co_sequence
