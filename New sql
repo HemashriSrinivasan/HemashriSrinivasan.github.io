@@ -1,3 +1,36 @@
+PO_PENDING_APPROVER AS (
+    SELECT
+        poh.po_header_id,
+        pov.CO_SEQUENCE,
+        LISTAGG(
+            CASE
+                WHEN wf.state = 'INFO_REQUESTED'
+                THEN wf.assigneesdisplayname || ' (Info Requested)'
+                ELSE wf.assigneesdisplayname
+            END,
+            ', '
+        ) WITHIN GROUP (ORDER BY wf.assigneesdisplayname) AS pending_with
+    FROM po_versions pov
+    INNER JOIN po_headers_all poh ON pov.po_header_id = poh.po_header_id
+    INNER JOIN po_action_history pah ON pov.version_id = pah.po_version_id 
+                                    AND pah.object_id = poh.po_header_id
+    INNER JOIN fa_fusion_soainfra.wftask wf ON pah.correlation_id = wf.correlationid
+    WHERE pah.object_type_code = 'PO'
+      AND wf.state IN ('ASSIGNED', 'SUSPENDED', 'INFO_REQUESTED', 'ACQUIRED')
+      AND wf.assignees IS NOT NULL
+      AND wf.workflowpattern NOT IN ('AGGREGATION', 'FYI')
+      AND wf.componentname = 'DocumentApproval'
+      -- Removed hardcoded PO number here
+    GROUP BY poh.po_header_id, pov.CO_SEQUENCE
+)
+
+
+
+
+
+
+
+
 AND (
     :P_SELECTED_APPROVER IS NULL 
     OR (
@@ -14,6 +47,26 @@ AND (
     )
 )
 
+
+
+CASE 
+    -- 1. If a filter is used, show the filtered person's name
+    WHEN :P_SELECTED_APPROVER IS NOT NULL THEN 
+         (SELECT ppnfv.display_name 
+          FROM per_person_names_f_v ppnfv 
+          WHERE ppnfv.person_id = :P_SELECTED_APPROVER 
+            AND ppnfv.name_type = 'GLOBAL' 
+            AND TRUNC(SYSDATE) BETWEEN ppnfv.effective_start_date AND ppnfv.effective_end_date
+            AND ROWNUM = 1)
+    
+    -- 2. If no filter, but status is Pending, show 'PENDING'
+    WHEN (poh.document_status = 'PENDING APPROVAL' OR po_change_order.change_order_status = 'PENDING APPROVAL') THEN 'PENDING'
+    
+    -- 3. Fallback: Show the latest completed approver (L7 down to L1)
+    WHEN po_change_order.co_sequence = 0 THEN poapp.selected_approver
+    ELSE COALESCE(wf.l7_anm, wf.l6_anm, wf.l5_anm, wf.l4_anm, wf.l3_anm, wf.l2_anm, wf.l1_anm)
+END AS selected_approver,
+shiv
 
 
 
