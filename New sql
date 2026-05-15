@@ -1,3 +1,26 @@
+AND (
+    :P_SELECTED_APPROVER IS NULL 
+    OR (
+       -- This handles cases where the user approved in the past
+       NVL(:P_SELECTED_APPROVER, -1) IN (
+           poapp.l1_aid, poapp.l2_aid, poapp.l3_aid, poapp.l4_aid,
+           wf.l1_aid, wf.l2_aid, wf.l3_aid, wf.l4_aid
+       )
+    )
+    OR (
+       -- This FORCE-KEEPS the row if it's pending, regardless of the user list
+       poh.document_status = 'PENDING APPROVAL'
+       OR NVL(po_change_order.change_order_status, 'X') = 'PENDING APPROVAL'
+    )
+)
+
+
+
+
+
+
+
+
 CASE
   -- Filter active + Base PO
   WHEN :P_SELECTED_APPROVER IS NOT NULL 
