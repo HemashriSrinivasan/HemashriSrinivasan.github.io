@@ -24,6 +24,50 @@ PO_PENDING_APPROVER AS (
     GROUP BY poh.po_header_id, pov.CO_SEQUENCE
 )
 
+CASE
+    WHEN :P_SELECTED_APPROVER IS NOT NULL THEN
+        CASE 
+            WHEN NVL(po_change_order.co_sequence, 0) = 0 THEN
+                -- BASE PO LEVEL SHIFTING (L1-L7)
+                CASE 
+                    WHEN poapp.l7_aid = :P_SELECTED_APPROVER THEN poapp.l6_approved_by
+                    WHEN poapp.l6_aid = :P_SELECTED_APPROVER THEN poapp.l5_approved_by
+                    WHEN poapp.l5_aid = :P_SELECTED_APPROVER THEN poapp.l4_approved_by
+                    WHEN poapp.l4_aid = :P_SELECTED_APPROVER THEN poapp.l3_approved_by
+                    WHEN poapp.l3_aid = :P_SELECTED_APPROVER THEN poapp.l2_approved_by
+                    WHEN poapp.l2_aid = :P_SELECTED_APPROVER THEN poapp.l1_approved_by
+                    WHEN poapp.l1_aid = :P_SELECTED_APPROVER THEN NULL -- L1 has no previous
+                    ELSE poapp.selected_approver -- Default if person is current pending
+                END
+            ELSE
+                -- CHANGE ORDER LEVEL SHIFTING (L1-L7)
+                CASE 
+                    WHEN wf.l7_aid = :P_SELECTED_APPROVER THEN wf.l6_anm
+                    WHEN wf.l6_aid = :P_SELECTED_APPROVER THEN wf.l5_anm
+                    WHEN wf.l5_aid = :P_SELECTED_APPROVER THEN wf.l4_anm
+                    WHEN wf.l4_aid = :P_SELECTED_APPROVER THEN wf.l3_anm
+                    WHEN wf.l3_aid = :P_SELECTED_APPROVER THEN wf.l2_anm
+                    WHEN wf.l2_aid = :P_SELECTED_APPROVER THEN wf.l1_anm
+                    WHEN wf.l1_aid = :P_SELECTED_APPROVER THEN NULL -- L1 has no previous
+                    ELSE COALESCE(wf.l7_anm, wf.l6_anm, wf.l5_anm, wf.l4_anm, wf.l3_anm, wf.l2_anm, wf.l1_anm)
+                END
+        END
+    ELSE 
+        -- IF NO FILTER: Show standard previous approver from PIVOT tables
+        CASE 
+            WHEN NVL(po_change_order.co_sequence, 0) = 0 THEN poapp.previous_approver
+            ELSE 
+                CASE
+                  WHEN wf.l7_anm IS NOT NULL AND wf.l7_anm != wf.l6_anm THEN wf.l6_anm
+                  WHEN wf.l6_anm IS NOT NULL AND wf.l6_anm != wf.l5_anm THEN wf.l5_anm
+                  WHEN wf.l5_anm IS NOT NULL AND wf.l5_anm != wf.l4_anm THEN wf.l4_anm
+                  WHEN wf.l4_anm IS NOT NULL AND wf.l4_anm != wf.l3_anm THEN wf.l3_anm
+                  WHEN wf.l3_anm IS NOT NULL AND wf.l3_anm != wf.l2_anm THEN wf.l2_anm
+                  WHEN wf.l2_anm IS NOT NULL AND wf.l2_anm != wf.l1_anm THEN wf.l1_anm
+                  ELSE NULL
+                END
+        END
+END AS previous_approver,
 
 
 
