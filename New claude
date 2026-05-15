@@ -1,3 +1,334 @@
+WITH xxtgf_po_approval AS
+(SELECT DISTINCT
+    FndBpmTaskHistoryEO.IDENTIFICATION_KEY AS identificationkey,
+    FndBpmTaskPEO.OUTCOME_CODE as OUTCOME ,
+    NULL state,
+    NULL UPDATEDBYDISPLAYNAME,
+    NVL((select DISTINCT ppnf.display_name
+    from per_all_people_f    papf
+       , per_person_names_f  ppnf
+       , per_email_addresses pea
+    WHERE  SYSDATE BETWEEN NVL(papf.effective_start_date, SYSDATE) AND NVL(papf.effective_end_date, SYSDATE)
+    AND    pea.email_address_id(+) = papf.primary_email_id
+    AND    SYSDATE BETWEEN NVL(pea.date_from(+), SYSDATE) AND NVL(pea.date_to(+), SYSDATE)
+    and    ppnf.person_id(+) = papf.person_id
+    and    ppnf.name_type(+) = 'GLOBAL'
+    and    SYSDATE BETWEEN NVL(ppnf.effective_start_date(+), SYSDATE) AND NVL(ppnf.effective_end_date(+), SYSDATE)
+    and    sysdate between nvl(papf.effective_start_date, sysdate) and nvl(papf.effective_end_date, sysdate)
+ and   UPPER(TRIM(pea.EMAIL_ADDRESS)) = UPPER(TRIM(FndBpmTaskAssigneePEO.ASSIGNEE))),FndBpmTaskAssigneePEO.ASSIGNEE) AS ASSIGNEE ,
+    poh.DOCUMENT_STATUS,
+    poh.segment1,
+    poh.po_header_id,
+ pov.CO_NUM,
+ pov.revision_num,
+ pbpn.auction_header_id,
+    TO_CHAR(FndBpmTaskPEO.COMPLETED_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN') action_date
+  FROM FUSION.FND_BPM_TASK_VL FndBpmTaskPEO,
+    FUSION.FND_BPM_TASK_HISTORY_B FndBpmTaskHistoryEO,
+    FUSION.FND_BPM_TASK_ASSIGNEE FndBpmTaskAssigneePEO,
+    FUSION.po_versions pov,
+ FUSION.po_headers_all poh,
+ PON_BID_PO_NUMBERS pbpn
+  WHERE 1=1
+   AND pov.po_header_id = poh.po_header_id
+   AND pov.approval_instance_id=FndBpmTaskPEO.composite_instance_id
+  AND FndBpmTaskPEO.task_id               = FndBpmTaskHistoryEO.task_id
+  AND FndBpmTaskHistoryEO.version_reason IN('TASK_VERSION_REASON_OUTCOME_UPDATED', 'TASK_VERSION_REASON_OUTCOME_UPDATED_AUTO', 'TASK_VERSION_REASON_WITHDRAWN')
+  AND FndBpmTaskAssigneePEO.task_id       = FndBpmTaskHistoryEO.task_id
+  AND FndBpmTaskAssigneePEO.version       = FndBpmTaskHistoryEO.version
+  AND FndBpmTaskPEO.TASK_DEFINITION_NAME IN ('DocumentApproval')
+  AND FndBpmTaskPEO.OUTCOME        IS NOT NULL
+  AND poh.segment1= pbpn.order_number(+)
+  AND poh.po_header_id= pbpn.po_header_id(+)
+/* AND  poh.segment1 = '2023-003717' */
+  --AND FndBpmTaskPEO.COMPLETED_DATE >= NVL( :p_from_date ,FndBpmTaskPEO.COMPLETED_DATE)
+ AND FndBpmTaskPEO.COMPLETED_DATE BETWEEN NVL(:P_FROM_DATE, (Select NVL(MAX(to_date(EXTN_ATTRIBUTE_CHAR009,'dd-mm-yyyy hh24:mi:ss')),to_date('01-01-2020',                                         'DD-MM-YYYY')) last_sync_date
+                                         FROM MOO_REF_ENTITIES
+                                                       WHERE ATTRIBUTE_CATEGORY  = 'XXTGF_VIEW_SYNC_DETAILS_c'
+                                                         AND EXTN_ATTRIBUTE_CHAR006  = 'XXTGF_PO_APPROVAL_DETAILS'
+                                                         AND EXTN_ATTRIBUTE_CHAR007  = 'S'))
+        AND NVL(:P_TO_DATE,SYSDATE) 
+ UNION ALL
+  
+  
+  
+  SELECT DISTINCT w.identificationkey,
+    w.outcome,
+    w.state,
+    w.FROMUSERDISPLAYNAME UPDATEDBYDISPLAYNAME,
+    w.assigneesdisplayname assignee, -- w.assigneesdisplayname   assignee,
+    poh.DOCUMENT_STATUS,
+    poh.segment1,
+    poh.po_header_id,
+ pov.CO_NUM,
+ pov.revision_num,
+ pbpn.auction_header_id,
+    TO_CHAR(w.updateddate,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN') action_date
+  FROM fa_fusion_soainfra.wftaskhistory w,
+    FUSION.po_versions pov,
+ FUSION.po_headers_all poh,
+ PON_BID_PO_NUMBERS pbpn
+  WHERE 1             =1
+  AND pov.po_header_id = poh.po_header_id
+  AND pov.approval_instance_id=w.compositeinstanceid
+  AND poh.segment1= pbpn.order_number(+)
+  AND poh.po_header_id= pbpn.po_header_id(+)
+ -- AND pov.revision_num= poh.revision_num
+  AND w.componentname = 'DocumentApproval'
+  AND w.category                       = 'Purchasing'
+  AND w.TASKDEFINITIONNAME            IN ('DocumentApproval')
+  --AND w.UPDATEDDATE                   >= NVL( :p_from_date ,w.UPDATEDDATE)
+  AND w.UPDATEDDATE BETWEEN NVL(:P_FROM_DATE, (Select NVL(MAX(to_date(EXTN_ATTRIBUTE_CHAR009,'dd-mm-yyyy hh24:mi:ss')),to_date('01-01-2020',                                         'DD-MM-YYYY')) last_sync_date
+                                         FROM MOO_REF_ENTITIES
+                                                       WHERE ATTRIBUTE_CATEGORY  = 'XXTGF_VIEW_SYNC_DETAILS_c'
+                                                         AND EXTN_ATTRIBUTE_CHAR006  = 'XXTGF_PO_APPROVAL_DETAILS'
+                                                         AND EXTN_ATTRIBUTE_CHAR007  = 'S'))
+        AND NVL(:P_TO_DATE,SYSDATE)
+
+
+  AND w.assigneesdisplayname          IS NOT NULL
+  AND NVL(w.workflowpattern, 'X') NOT IN ( 'FYI','AGGREGATION' )
+/* AND  poh.segment1 = '2023-003717' */
+  AND w.OUTCOME IN('APPROVE','REJECT')
+  AND (w.STATE   = 'OUTCOME_UPDATED')
+  UNION ALL
+  SELECT DISTINCT w.identificationkey ,
+    NVL(w.outcome,w.state),
+    w.state,
+    w.FROMUSERDISPLAYNAME UPDATEDBYDISPLAYNAME,
+    w.assigneesdisplayname assignee, -- w.assigneesdisplayname   assignee,
+    poh.DOCUMENT_STATUS,
+    poh.segment1,
+    poh.po_header_id,
+ pov.CO_NUM,
+ pov.revision_num,
+ pbpn.auction_header_id,
+    --CASE WHEN w.assigneesdisplayname IS NULL THEN to_char(prha.CREATION_DATE,'YYYY-MM-DD HH24:MI:SS') ELSE to_char(w.updateddate,'YYYY-MM-DD HH24:MI:SS')   END AS CREATION_DATE,
+    --to_char(prha.LAST_UPDATE_DATE,'YYYY-MM-DD HH24:MI:SS') LAST_UPDATE_DATE,
+    TO_CHAR(w.updateddate,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN') action_date
+  FROM  FA_fusion_soainfra.wftask w,
+        FUSION.po_versions pov,
+     FUSION.po_headers_all poh,
+  PON_BID_PO_NUMBERS pbpn
+  WHERE 1             =1
+  AND pov.po_header_id = poh.po_header_id
+  --AND pov.change_order_status = 'PENDING APPROVAL'
+  AND pov.approval_instance_id=w.compositeinstanceid
+  AND poh.segment1= pbpn.order_number(+)
+  AND poh.po_header_id= pbpn.po_header_id(+)
+  AND w.componentname = 'DocumentApproval'
+  AND w.category                       = 'Purchasing'
+  AND w.TASKDEFINITIONNAME            IN ('DocumentApproval')
+  AND w.UPDATEDDATE BETWEEN NVL(:P_FROM_DATE, (Select NVL(MAX(to_date(EXTN_ATTRIBUTE_CHAR009,'dd-mm-yyyy hh24:mi:ss')),to_date('01-01-2020',                                         'DD-MM-YYYY')) last_sync_date
+                                         FROM MOO_REF_ENTITIES
+                                                       WHERE ATTRIBUTE_CATEGORY  = 'XXTGF_VIEW_SYNC_DETAILS_c'
+                                                         AND EXTN_ATTRIBUTE_CHAR006  = 'XXTGF_PO_APPROVAL_DETAILS'
+                                                         AND EXTN_ATTRIBUTE_CHAR007  = 'S'))
+        AND NVL(:P_TO_DATE,SYSDATE)
+  AND w.assigneesdisplayname          IS NOT NULL
+  AND NVL(w.workflowpattern, 'X') NOT IN ( 'FYI','AGGREGATION' )
+  AND w.STATE='ASSIGNED'
+/*   AND  poh.segment1 = '2023-003717' */
+  --ORDER BY 10
+  )
+  ,
+ PO_DETAILS AS
+  (SELECT
+   Version.CO_NUM,
+   Version.REVISION_NUM,
+    phaa.segment1 AS PO_NUMBER,
+ phaa.segment1,
+    phaa.po_header_id AS po_header_id,
+ pbpn.auction_header_id,
+ TO_CHAR(Version.CREATION_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN') po_creation_date,
+ TO_CHAR(Version.CREATION_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN') creation_date,
+    TO_CHAR(Version.CREATION_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN') action_date,
+    MAX(phaa.CURRENCY_CODE)||' '|| TRIM( TO_CHAR( SUM(  CASE
+    WHEN plaa.MATCHING_BASIS = 'AMOUNT'
+    THEN NVL(plaa.unit_price,1)  * (NVL(plaa.amount,1)+NVL(plaa.attribute_number4,0))
+    ELSE (NVL(plaa.unit_price,1) * (NVL(plaa.quantity,1))) +NVL(plaa.attribute_number4,0)
+    END),'999,999,999,999,999.00'))AS TOTAL_PO_AMOUNT,
+    NULL approval_level
+  FROM PO_HEADERS_ARCHIVE_ALL phaa ,
+       PO_LINES_ARCHIVE_ALL plaa,
+       PO_VERSIONS Version,
+    PON_BID_PO_NUMBERS pbpn
+  WHERE 1                       =1
+   AND phaa.po_header_id = plaa.po_header_id
+   AND phaa.po_header_id = Version.po_header_id
+   AND phaa.segment1= pbpn.order_number(+)
+   AND phaa.po_header_id= pbpn.po_header_id(+)
+   AND Version.REVISION_NUM IS NOT NULL
+   AND phaa.FROM_CO_SEQ <= Version.CO_SEQUENCE AND phaa.TO_CO_SEQ > Version.CO_SEQUENCE 
+   AND plaa.FROM_CO_SEQ <= Version.CO_SEQUENCE AND plaa.TO_CO_SEQ > Version.CO_SEQUENCE
+   AND phaa.LAST_UPDATE_DATE BETWEEN NVL(:P_FROM_DATE, (Select NVL(MAX(to_date(EXTN_ATTRIBUTE_CHAR009,'dd-mm-yyyy hh24:mi:ss')),to_date('01-01-2020',                                         'DD-MM-YYYY')) last_sync_date
+                                         FROM MOO_REF_ENTITIES
+                                                       WHERE ATTRIBUTE_CATEGORY  = 'XXTGF_VIEW_SYNC_DETAILS_c'
+                                                         AND EXTN_ATTRIBUTE_CHAR006  = 'XXTGF_PO_APPROVAL_DETAILS'
+                                                         AND EXTN_ATTRIBUTE_CHAR007  = 'S'))
+        AND NVL(:P_TO_DATE,SYSDATE) 
+  --AND prh.CREATION_DATE        >= NVL( :p_from_date ,prh.CREATION_DATE)
+    --AND  EXISTS (select 1 from xxtgf_por_approval where requisition_header_id=  prh.requisition_header_id)
+    --AND  SEGMENT1 = '2023-003717'
+  GROUP BY
+  Version.CO_NUM,
+  Version.REVISION_NUM,
+  phaa.segment1,
+  phaa.po_header_id,
+  pbpn.auction_header_id,
+ TO_CHAR(Version.CREATION_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN')
+  ),
+  
+  PO_DETAILS_NOREV AS
+  (
+SELECT
+    phaa.segment1 AS PO_NUMBER,
+ phaa.segment1,
+    phaa.po_header_id AS po_header_id,
+ pbpn.auction_header_id,
+ TO_CHAR(phaa.CREATION_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN') po_creation_date,
+ TO_CHAR(phaa.CREATION_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN') creation_date,
+    TO_CHAR(phaa.LAST_UPDATE_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN') action_date,
+    MAX(phaa.CURRENCY_CODE)||' '|| TRIM( TO_CHAR( SUM(  CASE
+    WHEN plaa.MATCHING_BASIS = 'AMOUNT'
+    THEN NVL(plaa.unit_price,1)  * (NVL(plaa.amount,1)+NVL(plaa.attribute_number4,0))
+    ELSE (NVL(plaa.unit_price,1) * (NVL(plaa.quantity,1))) +NVL(plaa.attribute_number4,0)
+    END),'999,999,999,999,999.00'))AS TOTAL_PO_AMOUNT,
+    NULL approval_level
+  FROM PO_HEADERS_ALL phaa ,
+       PO_LINES_ALL plaa,
+    PON_BID_PO_NUMBERS pbpn
+  WHERE 1                       =1
+   AND phaa.po_header_id = plaa.po_header_id
+   AND phaa.segment1= pbpn.order_number(+)
+   AND phaa.po_header_id= pbpn.po_header_id(+)
+   AND phaa.REVISION_NUM IS NULL
+   AND phaa.LAST_UPDATE_DATE BETWEEN NVL(:P_FROM_DATE, (Select NVL(MAX(to_date(EXTN_ATTRIBUTE_CHAR009,'dd-mm-yyyy hh24:mi:ss')),to_date('01-01-2020',                                         'DD-MM-YYYY')) last_sync_date
+                                         FROM MOO_REF_ENTITIES
+                                                       WHERE ATTRIBUTE_CATEGORY  = 'XXTGF_VIEW_SYNC_DETAILS_c'
+                                                         AND EXTN_ATTRIBUTE_CHAR006  = 'XXTGF_PO_APPROVAL_DETAILS'
+                                                         AND EXTN_ATTRIBUTE_CHAR007  = 'S'))
+        AND NVL(:P_TO_DATE,SYSDATE) 
+  --AND prh.CREATION_DATE        >= NVL( :p_from_date ,prh.CREATION_DATE)
+    --AND  EXISTS (select 1 from xxtgf_por_approval where requisition_header_id=  prh.requisition_header_id)
+--AND  SEGMENT1 = '2023-005943'
+  GROUP BY
+  phaa.segment1,
+  phaa.po_header_id,
+  pbpn.auction_header_id,
+ TO_CHAR(phaa.CREATION_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN'),
+  TO_CHAR(phaa.LAST_UPDATE_DATE,'DD-MON-YYYY HH24:MI:SS','NLS_DATE_LANGUAGE = AMERICAN')
+
+  ),
+  
+   unpiv_att_val_po_update AS
+  ( SELECT DISTINCT attr_val,
+    attr_col,
+ --creation_date,
+    PO_HEADER_ID,
+ segment1,
+    creation_date,
+ REVISION_NUM,
+ CO_NUM,
+ auction_header_id
+  FROM
+    (SELECT a.* 
+    FROM PO_DETAILS a
+    )item_eff UNPIVOT( attr_val FOR attr_col IN (po_creation_date, TOTAL_PO_AMOUNT, PO_NUMBER ) ) unpiv
+ 
+ UNION
+ 
+ SELECT DISTINCT attr_val,
+    attr_col,
+ --creation_date,
+    PO_HEADER_ID,
+ segment1,
+    creation_date,
+ NULL REVISION_NUM,
+ NULL CO_NUM,
+ auction_header_id
+  FROM
+    (SELECT a.* 
+    FROM PO_DETAILS_NOREV a
+    )item_eff UNPIVOT( attr_val FOR attr_col IN (po_creation_date, TOTAL_PO_AMOUNT, PO_NUMBER ) ) unpiv
+ 
+ 
+  ORDER BY 1 DESC
+  )
+  
+ /*   unpiv_att_val_po_update AS
+  ( SELECT DISTINCT attr_val,
+    attr_col,
+ --creation_date,
+    PO_HEADER_ID,
+ segment1,
+    creation_date,
+ REVISION_NUM,
+ CO_NUM,
+ auction_header_id
+  FROM
+    (SELECT a.* 
+    FROM PO_DETAILS a
+    )item_eff UNPIVOT( attr_val FOR attr_col IN (po_creation_date, TOTAL_PO_AMOUNT, PO_NUMBER ) ) unpiv
+  ORDER BY attr_val DESC
+  ) */
+  
+ -- select * from unpiv_att_val_po_update
+  
+  
+  SELECT distinct
+DECODE(approval_level,'APPROVE','APPROVER',approval_level) as label,
+action_date as ACTION_DATE,
+segment1 as PONUMBER,
+null as LABEL1,
+null as ACTION,
+assignee as STATUS,
+PO_HEADER_ID,
+REVISION_NUM,
+CO_NUM,  
+auction_header_id,  
+null CREATION_DATE,      
+null CREATED_BY,
+null LAST_UPDATE_DATE,   
+null LAST_UPDATED_BY,
+to_char(:P_TO_DATE, 'YYYY-MM-DD HH24:MI') as "KEY"
+FROM
+  (SELECT attr_val AS assignee,
+    PO_HEADER_ID,
+    segment1,
+ REVISION_NUM,
+ CO_NUM,
+ auction_header_id,
+    creation_date as action_date,
+   attr_col AS approval_level
+  FROM unpiv_att_val_po_update
+  UNION ALL
+  SELECT assignee,
+    po_header_id,
+    segment1,
+ REVISION_NUM,
+ CO_NUM,
+ auction_header_id,
+    action_date,
+    NVL(outcome,state) AS approval_level
+  FROM xxtgf_po_approval
+  ) XX
+  --WHERE PO_HEADER_ID=300000027477574 and REVISION_NUM=0
+  --ORDER BY action_date desc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- =====================================================
 -- BLOCK 1: BASE PO APPROVAL (WITH MAX CYCLE FILTER)
 -- =====================================================
