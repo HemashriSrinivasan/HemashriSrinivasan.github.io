@@ -1,0 +1,57 @@
+AND (
+        :P_SELECTED_APPROVER IS NULL
+        OR poh.document_status = 'PENDING APPROVAL'  -- Include pending approvals
+        OR (
+            po_change_order.is_change_order = 'NO'
+            AND :P_SELECTED_APPROVER IN (
+                poapp.l1_aid, poapp.l2_aid, poapp.l3_aid,
+                poapp.l4_aid, poapp.l5_aid, poapp.l6_aid, poapp.l7_aid
+            )
+        )
+        OR (
+            po_change_order.is_change_order = 'YES'
+            AND :P_SELECTED_APPROVER IN (
+                wf.l1_aid, wf.l2_aid, wf.l3_aid,
+                wf.l4_aid, wf.l5_aid, wf.l6_aid, wf.l7_aid
+            )
+        )
+    )
+
+CASE
+  -- When parameter is set and it's a regular PO (co_sequence = 0)
+  WHEN :P_SELECTED_APPROVER IS NOT NULL
+   AND po_change_order.co_sequence = 0 THEN
+    CASE
+      WHEN poapp.l1_aid = :P_SELECTED_APPROVER THEN poapp.l1_approved_by
+      WHEN poapp.l2_aid = :P_SELECTED_APPROVER THEN poapp.l2_approved_by
+      WHEN poapp.l3_aid = :P_SELECTED_APPROVER THEN poapp.l3_approved_by
+      WHEN poapp.l4_aid = :P_SELECTED_APPROVER THEN poapp.l4_approved_by
+      WHEN poapp.l5_aid = :P_SELECTED_APPROVER THEN poapp.l5_approved_by
+      WHEN poapp.l6_aid = :P_SELECTED_APPROVER THEN poapp.l6_approved_by
+      WHEN poapp.l7_aid = :P_SELECTED_APPROVER THEN poapp.l7_approved_by
+    END
+  -- When parameter is set and it's a change order (co_sequence > 0)
+  WHEN :P_SELECTED_APPROVER IS NOT NULL
+   AND po_change_order.co_sequence > 0 THEN
+    CASE
+      WHEN wf.l1_aid = :P_SELECTED_APPROVER THEN wf.l1_anm
+      WHEN wf.l2_aid = :P_SELECTED_APPROVER THEN wf.l2_anm
+      WHEN wf.l3_aid = :P_SELECTED_APPROVER THEN wf.l3_anm
+      WHEN wf.l4_aid = :P_SELECTED_APPROVER THEN wf.l4_anm
+      WHEN wf.l5_aid = :P_SELECTED_APPROVER THEN wf.l5_anm
+      WHEN wf.l6_aid = :P_SELECTED_APPROVER THEN wf.l6_anm
+      WHEN wf.l7_aid = :P_SELECTED_APPROVER THEN wf.l7_anm
+    END
+  -- When parameter is NULL and it's a regular PO with approvals
+  WHEN po_change_order.co_sequence = 0 AND poapp.selected_approver IS NOT NULL
+    THEN poapp.selected_approver
+  -- When parameter is NULL and it's a change order with approvals
+  WHEN po_change_order.co_sequence > 0 AND (
+        wf.l1_anm IS NOT NULL OR wf.l2_anm IS NOT NULL OR wf.l3_anm IS NOT NULL
+        OR wf.l4_anm IS NOT NULL OR wf.l5_anm IS NOT NULL OR wf.l6_anm IS NOT NULL
+        OR wf.l7_anm IS NOT NULL) THEN
+    COALESCE(wf.l7_anm, wf.l6_anm, wf.l5_anm, wf.l4_anm, wf.l3_anm, wf.l2_anm, wf.l1_anm)
+  -- **NEW: For pending approvals (no completed approvals), show pending approver**
+  WHEN poh.document_status = 'PENDING APPROVAL' THEN popen.pending_with
+  ELSE NULL
+END AS selected_approver
