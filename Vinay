@@ -1,0 +1,14 @@
+IF (string-length(PayeeBankAccount/SwiftCode) > 8
+   and not(number(PayeeBankAccount/SwiftCode)=number(PayeeBankAccount/SwiftCode)))
+THEN
+   concat(
+       substring(
+           PayeeBankAccount/SwiftCode,
+           1,
+           string-length(PayeeBankAccount/SwiftCode)-3
+       ),
+       'XXX'
+   )
+ELSE
+   PayeeBankAccount/SwiftCode
+END IF
