@@ -1,7 +1,44 @@
-WITH base_po_rows AS (
-    SELECT
-        poh.po_header_id,
-        poh.prc_bu_id,
+
+    Prerequisites:
+​System and Integration Setup
+a. Ensure the Oracle ADF Desktop Integration (ADFdi) add-in is installed and enabled in Microsoft Excel.
+b. Ensure you have the necessary roles and privileges to enter unprocessed costs and access the relevant business units.
+​Project Setup in Oracle PPM
+a. Ensure the project name, tasks, expenditure organization, and expenditure types are fully defined, valid, and active.
+b. Confirm the project is open for cost collection.
+​Navigation: Navigator > Projects > Costs
+​Procedure:
+​Navigate to Manage Unprocessed Costs
+a. From the Costs Overview page, open the Tasks panel on the right side.
+b. Under the Capture section, select Manage Unprocessed Costs.
+​Download the Spreadsheet Template
+a. Click the Create Unprocessed Cost drop-down menu on the top right.
+b. Select Uncosted Nonlabor to generate and open the ADFdi Excel spreadsheet.
+​Connect Excel to Oracle Fusion
+a. Open the downloaded Excel file.
+b. A connection prompt will appear stating, "You are about to connect to the following application URL.".
+c. Click Yes and authenticate if required.
+​Enter Cost Transaction Details
+a. In the Excel spreadsheet header, select the required Business Unit, Source, and Document (e.g., POML Cost Transaction).
+b. In the Expenditure Items table, populate the required fields for each transaction line.
+c. Ensure you enter the Document Entry, Expenditure Item Date, Project Number, Task Number, Expenditure Type, Expenditure Organization, and Quantity.
+​Submit and Process the Upload
+a. Upload the rows to the application using the ADFdi ribbon options.
+b. Review the Import and Process Cost Transactions Execution Report generated after submission.
+c. Verify that the "Successful Transactions" count matches your input and that there are zero warnings or errors.
+​Verify the Imported Costs
+a. Return to the Oracle Fusion application Tasks panel.
+b. Under the Review and Adjust section, select Manage Project Costs.
+c. Search for your newly imported transactions.
+d. Click on the resulting Transaction Number link to open the Project Cost Transaction details page.
+​View Accounting Details
+a. Navigate to the Costing tab on the Project Cost Transaction page.
+b. Click on the Actions button.
+c. Hover over Accounting and select View Accounting.
+d. A View Accounting dialog box will appear.
+e. Review the Project Accounting Lines to verify the Debit and Credit accounts.
+f. Click Done to close the window.
+        
         poh.segment1,
         CAST(NULL AS NUMBER)         AS co_sequence,
         CAST(NULL AS VARCHAR2(80))   AS co_num,
