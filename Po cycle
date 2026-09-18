@@ -1,4 +1,39 @@
-
+This screenshot reveals the exact root cause: the transaction is already fully accounted in
+Subledger Accounting (SLA).
+In the window:
+● Status: Final
+● Date: 1-Sep-2026
+● The subledger debit and credit lines are already generated and balanced (1,565.86 PGK).
+Because the transaction is already in Final status, the Create Accounting program has nothing
+left to generate, which is why your execution report keeps returning "There are no eligible
+transactions to be processed".
+However, because the batch was not transferred and posted to the General Ledger during the
+original run, the subledger journal entry is sitting in SLA without being posted to GL.
+Solution: Run "Post Subledger Journal Entries" Directly
+You do not need to run Create Accounting again. Instead, submit the posting process directly to
+push the final subledger entries to the ledger:
+1. In the Navigator, go to Tools \rightarrow Scheduled Processes.
+2. Click Schedule New Process.
+3. Search for and select: Post Subledger Journal Entries.
+4. Enter the parameters:
+○ Subledger Application: Project Costing (or Project Accounting)
+○ Ledger: PGK_POML_PRIMARY_LEDGER
+○ Accounting Date: 2026-09-01 (or leave blank to process all final unposted entries
+up to today)
+○ Posting Status: Unposted
+5. Submit the process.
+Alternative: Post Directly via General Ledger If the entry has already been transferred to
+General Ledger as an unposted journal:
+1. Navigate to General Accounting \rightarrow Journals.
+2. In the task panel, select Manage Journals.
+3. Search for:
+○ Source: Project Costing (or Project Accounting)
+○ Batch / Period: Sep-26
+○ Posting Status: Unposted
+4. Select the batch and click Post.
+Verification: After running the process, check Manage Project Costs or your General Ledger
+balance inquiry; the account balances for accounts 38110002 and 71111010 will now reflect the
+1,565.86 movement.
     Prerequisites:
 ​System and Integration Setup
 a. Ensure the Oracle ADF Desktop Integration (ADFdi) add-in is installed and enabled in Microsoft Excel.
@@ -38,7 +73,17 @@ c. Hover over Accounting and select View Accounting.
 d. A View Accounting dialog box will appear.
 e. Review the Project Accounting Lines to verify the Debit and Credit accounts.
 f. Click Done to close the window.
-        
+
+
+
+
+
+
+
+
+
+
+
         poh.segment1,
         CAST(NULL AS NUMBER)         AS co_sequence,
         CAST(NULL AS VARCHAR2(80))   AS co_num,
