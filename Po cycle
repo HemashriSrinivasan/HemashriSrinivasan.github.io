@@ -1,111 +1,21 @@
-Subject: Tax Calculation Issue Resolved in DEV40 – Testing & Prod Configuration Confirmation
-Hi Cathy,
-We have resolved the tax calculation issue in the DEV40 environment.
-Tax will now be calculated and updated automatically in the header once it is entered at the line level during invoice processing (upon triggering tax calculation or validation). You will no longer need to manually re-enter or adjust tax lines in the header tax tab.
-Please review and test this behavior in DEV40 to confirm that the fix works as expected. Attached are the testing documents and screenshots for your reference.
-Once you have verified and confirmed everything is working properly, please let us know so we can proceed with deploying and configuring the same setup in Production.
-Best regards,
-[Your Name]
-[Your Title]
-
-
-Subject: Tax Calculation Issue Fixed in DEV40 – Testing & Sign-off for Prod
-Hi Cathy,
-The line-level tax calculation issue has been resolved in the DEV40 environment. Tax will now calculate and update automatically from the line level to the header without needing manual entry in the header tax tab.
-Please test and confirm in DEV40 using the attached test documents. Once you confirm, we will replicate the configuration in Production.
-Thanks,
-[Your Name]
-
-
-
-
-
-
-
-
-
-
-
-
-This screenshot reveals the exact root cause: the transaction is already fully accounted in
-Subledger Accounting (SLA).
-In the window:
-● Status: Final
-● Date: 1-Sep-2026
-● The subledger debit and credit lines are already generated and balanced (1,565.86 PGK).
-Because the transaction is already in Final status, the Create Accounting program has nothing
-left to generate, which is why your execution report keeps returning "There are no eligible
-transactions to be processed".
-However, because the batch was not transferred and posted to the General Ledger during the
-original run, the subledger journal entry is sitting in SLA without being posted to GL.
-Solution: Run "Post Subledger Journal Entries" Directly
-You do not need to run Create Accounting again. Instead, submit the posting process directly to
-push the final subledger entries to the ledger:
-1. In the Navigator, go to Tools \rightarrow Scheduled Processes.
-2. Click Schedule New Process.
-3. Search for and select: Post Subledger Journal Entries.
-4. Enter the parameters:
-○ Subledger Application: Project Costing (or Project Accounting)
-○ Ledger: PGK_POML_PRIMARY_LEDGER
-○ Accounting Date: 2026-09-01 (or leave blank to process all final unposted entries
-up to today)
-○ Posting Status: Unposted
-5. Submit the process.
-Alternative: Post Directly via General Ledger If the entry has already been transferred to
-General Ledger as an unposted journal:
-1. Navigate to General Accounting \rightarrow Journals.
-2. In the task panel, select Manage Journals.
-3. Search for:
-○ Source: Project Costing (or Project Accounting)
-○ Batch / Period: Sep-26
-○ Posting Status: Unposted
-4. Select the batch and click Post.
-Verification: After running the process, check Manage Project Costs or your General Ledger
-balance inquiry; the account balances for accounts 38110002 and 71111010 will now reflect the
-1,565.86 movement.
-    Prerequisites:
-​System and Integration Setup
-a. Ensure the Oracle ADF Desktop Integration (ADFdi) add-in is installed and enabled in Microsoft Excel.
-b. Ensure you have the necessary roles and privileges to enter unprocessed costs and access the relevant business units.
-​Project Setup in Oracle PPM
-a. Ensure the project name, tasks, expenditure organization, and expenditure types are fully defined, valid, and active.
-b. Confirm the project is open for cost collection.
-​Navigation: Navigator > Projects > Costs
-​Procedure:
-​Navigate to Manage Unprocessed Costs
-a. From the Costs Overview page, open the Tasks panel on the right side.
-b. Under the Capture section, select Manage Unprocessed Costs.
-​Download the Spreadsheet Template
-a. Click the Create Unprocessed Cost drop-down menu on the top right.
-b. Select Uncosted Nonlabor to generate and open the ADFdi Excel spreadsheet.
-​Connect Excel to Oracle Fusion
-a. Open the downloaded Excel file.
-b. A connection prompt will appear stating, "You are about to connect to the following application URL.".
-c. Click Yes and authenticate if required.
-​Enter Cost Transaction Details
-a. In the Excel spreadsheet header, select the required Business Unit, Source, and Document (e.g., POML Cost Transaction).
-b. In the Expenditure Items table, populate the required fields for each transaction line.
-c. Ensure you enter the Document Entry, Expenditure Item Date, Project Number, Task Number, Expenditure Type, Expenditure Organization, and Quantity.
-​Submit and Process the Upload
-a. Upload the rows to the application using the ADFdi ribbon options.
-b. Review the Import and Process Cost Transactions Execution Report generated after submission.
-c. Verify that the "Successful Transactions" count matches your input and that there are zero warnings or errors.
-​Verify the Imported Costs
-a. Return to the Oracle Fusion application Tasks panel.
-b. Under the Review and Adjust section, select Manage Project Costs.
-c. Search for your newly imported transactions.
-d. Click on the resulting Transaction Number link to open the Project Cost Transaction details page.
-​View Accounting Details
-a. Navigate to the Costing tab on the Project Cost Transaction page.
-b. Click on the Actions button.
-c. Hover over Accounting and select View Accounting.
-d. A View Accounting dialog box will appear.
-e. Review the Project Accounting Lines to verify the Debit and Credit accounts.
-f. Click Done to close the window.
-
-
-
-
+Here are two clearer, more professional ways to rephrase your email:
+Option 1: Professional and clear (Recommended)
+> Hi Dom,
+> Project POM-101558 is currently assigned to PNG Flyriver. Since we cannot change the Business Unit (BU) of an existing project, we have two options to proceed:
+>  * Create a new project under PNG.
+>  * Keep the current project and assign the PO under PNG Flyriver.
+> Please let us know how you would like to proceed.
+> Best regards,
+> Hemashri S
+> 
+Option 2: Concise and direct
+> Hi Dom,
+> Project POM-101558 is mapped to PNG Flyriver, and the Business Unit cannot be updated on an existing project.
+> If you need this processed under PNG, we will need to create a new project. Otherwise, the PO can be assigned directly under Flyriver.
+> Please confirm your preferred approach.
+> Best regards,
+> Hemashri S
+> 
 
 
 
