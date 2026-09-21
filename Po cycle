@@ -1,3 +1,32 @@
+Subject: Tax Calculation Issue Resolved in DEV40 – Testing & Prod Configuration Confirmation
+Hi Cathy,
+We have resolved the tax calculation issue in the DEV40 environment.
+Tax will now be calculated and updated automatically in the header once it is entered at the line level during invoice processing (upon triggering tax calculation or validation). You will no longer need to manually re-enter or adjust tax lines in the header tax tab.
+Please review and test this behavior in DEV40 to confirm that the fix works as expected. Attached are the testing documents and screenshots for your reference.
+Once you have verified and confirmed everything is working properly, please let us know so we can proceed with deploying and configuring the same setup in Production.
+Best regards,
+[Your Name]
+[Your Title]
+
+
+Subject: Tax Calculation Issue Fixed in DEV40 – Testing & Sign-off for Prod
+Hi Cathy,
+The line-level tax calculation issue has been resolved in the DEV40 environment. Tax will now calculate and update automatically from the line level to the header without needing manual entry in the header tax tab.
+Please test and confirm in DEV40 using the attached test documents. Once you confirm, we will replicate the configuration in Production.
+Thanks,
+[Your Name]
+
+
+
+
+
+
+
+
+
+
+
+
 This screenshot reveals the exact root cause: the transaction is already fully accounted in
 Subledger Accounting (SLA).
 In the window:
