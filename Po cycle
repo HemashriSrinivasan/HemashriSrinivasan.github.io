@@ -21,6 +21,20 @@ Option 2: Concise and direct
 
 
 
+Here is a clear and professional draft you can use:
+Subject: Request for Approval: Remove End Date for Expenditure Type "Donations-G&A"
+Hi Dwaraka,
+We received an issue from a user where they are unable to select the expenditure type "Donations-G&A" on the invoice line for project 101530, task 15 (Office Overhead Expenses).
+Upon checking the setup in Manage Expenditure Types, we observed that under the expenditure type Donations-G&A, the Supplier Invoices expenditure type class is end-dated as of 24-Nov-2022. Because of this, it is not appearing in the List of Values (LOV) during invoice entry.
+Could you please confirm if we can clear (or extend) the end date for the Supplier Invoices class on this expenditure type so users can proceed with invoice processing?
+Thanks,
+[Your Name]
+
+
+
+
+
+
 
 
         poh.segment1,
