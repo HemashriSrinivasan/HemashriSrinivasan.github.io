@@ -21,6 +21,40 @@ Option 2: Concise and direct
 
 
 
+
+Perfect - you are in the exact screen to edit it!
+
+You *CANNOT* directly type in the amount field. Oracle PPM only allows to edit via *Adjustment*.
+
+From your screenshot:
+
+You have 4 lines for `POM-101539` / `Travelling-COS`. Do this:
+
+1.  Select *ONE* wrong line (check the checkbox on left)
+2.  `Actions > Costing > Recalculate Raw Cost Amount`  <- Click this (you are showing it in your pic)
+
+3.  A pop-up will open:
+    - `New Raw Cost Amount` = Enter correct amount (e.g. if you imported -100 Debit, now put `100` )
+    - `Reason` = Select `Other` / `Correction`
+    - Click `Submit`
+
+4.  This will create 2 lines:
+    - 1 line reversing your old wrong amount
+    - 1 line with new correct amount
+
+5.  After that, run these 2 ESS jobs from `Scheduled Processes`:
+    - `PRC: Distribute Costs`
+    - `PRC: Create Accounting` for that Business Unit
+
+*Important:*
+- If you also need to change Debit/Credit, you can't with Recalculate. You must do `Actions > Costing > Reverse` first, then re-import FBDI with Credit indicator.
+- `Recalculate Raw Cost Amount` only changes amount, not D/C.
+
+Try `Recalculate Raw Cost Amount` for 1 line first and tell me if you see the New Amount pop-up.
+
+
+
+
 Here is a clear and professional draft you can use:
 Subject: Request for Approval: Remove End Date for Expenditure Type "Donations-G&A"
 Hi Dwaraka,
