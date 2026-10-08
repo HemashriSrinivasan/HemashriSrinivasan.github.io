@@ -18,7 +18,17 @@ Option 2: Concise and direct
 > 
 
 
-
+SELECT 
+  p.payment_id,
+  p.payment_reference_number,
+  p.payment_instruction_id,
+  p.payee_email_address,
+  p.remittance_advice_email,
+  p.separate_remittance_advice_flag,
+  p.payment_delivery_method
+FROM iby_payments_all p
+WHERE p.payment_id = 15772099;
+-- your payment from log
 
 
 
