@@ -1,4 +1,38 @@
-Here are two clearer, more professional ways to rephrase your email:
+Here is the final reply draft for Marites - ready to send:
+
+---
+*To:* Marites Elano
+*Cc:* Swetha MD, Krishnakumar Bulusu, Dominic McCabe, Cathy Yu
+*Subject:* RE: Invoice - AR
+
+Hi Marites,
+
+Thank you for your email. Please find my response below:
+
+*1. Invoice creation via spreadsheet:*
+I have already sent an email regarding this. Also attaching the training document again for your reference - you can find the steps from *Page 57 to 73* for creating transactions using spreadsheet / Import.
+
+*2. Memo Lines - Fly Zamby Management Fee and Fly Zamby OPEX:*
+Dom had provided 39 records of memo lines to be added newly. I have checked that list and I could not find the two memo lines you mentioned - Fly Zamby Management Fee and Fly Zamby OPEX.
+
+Could you please share the revenue accounts for these two lines? I have attached a sample line format below for reference. Once you share the accounts, I can add them in the system.
+
+Sample format attached:
+[Attach sample memo line screenshot]
+
+*3. Bank Account details missing in invoice:*
+We have migrated the updated AR templates to production yesterday evening. So hereafter while creating AR transactions, we must enter the bank account details in the header.
+
+I have attached a document which has the steps to follow while creating invoice transactions going forward. Please follow the same and the bank account details will appear correctly in POMS PNG and Fly River invoices.
+
+For the invoices already created without bank details, we will check and update.
+
+Let me know if you need any help.
+
+Regards,
+*Hemashri S*
+Tech Consultant
+DPW FZE POML CORPORATE - CCHere are two clearer, more professional ways to rephrase your email:
 Option 1: Professional and clear (Recommended)
 > Hi Dom,
 > Project POM-101558 is currently assigned to PNG Flyriver. Since we cannot change the Business Unit (BU) of an existing project, we have two options to proceed:
