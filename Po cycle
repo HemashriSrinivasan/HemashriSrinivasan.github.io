@@ -1,3 +1,52 @@
+
+Here is a simple + clear version with explanation:
+
+*Subject:* Request for Domain Email to Fix Remittance Advice Notification
+
+Hi Kishor,
+
+We are facing an issue where *Remittance Advice email is not being sent to suppliers* after payment in Oracle.
+
+*What we found:*
+In *Manage Disbursement Setup*, a sender email is mandatory to trigger the notification. Currently no valid customer domain email is configured.
+
+*What we tried:*
+We tested with *ehpv@fusion.com*, but it failed because it is not a verified customer domain.
+
+*What Oracle suggested:*
+Oracle advised that for any DPW related emails to work, we need to use a *customer domain email* and complete the *SPF setup*. Steps shared by Oracle are in the screenshot attached.
+
+*Request:*
+Could you please help us provide a valid customer domain email (like noreply@dpworld.com) and help with SPF setup for the same?
+
+Once done, we will update the setup and confirm if suppliers start receiving remittance emails.
+
+Thanks for your help.
+
+Best regards,
+Vinay
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Here is the final reply draft for Marites - ready to send:
 
 ---
