@@ -1,4 +1,27 @@
 
+Here is a polite email draft for Dom:
+
+---
+*Subject:* Request for Correct BIC - Yellow Highlighted BIC Update
+
+Hi Dom,
+
+Hope you are well.
+
+As requested, I have updated all the yellow highlighted BIC codes, except for one bank branch.
+
+For this particular branch, I am getting the error attached below.
+
+*Reason for error:*
+The BSB code series belongs to AUD and the country is shown as Australia, but the BIC we are trying to update belongs to PNG. Due to this country/BIC mismatch, the system is not allowing me to update.
+
+Could you please help confirm and provide the correct BIC code that I should update for this specific bank branch?
+
+Once you provide the correct BIC, I will update it immediately.
+
+Thanks for your support.
+
+Kind regards,
 
 
 Subject: BIC Codes Added to Bank Branches - Mapping Confirmation Required
