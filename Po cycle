@@ -1,4 +1,36 @@
+Here is the professional version of your email in the screenshot:
 
+---
+*To:* Cathy Yu
+*Cc:* Dominic McCabe; Swetha MD; Krishnakumar Bulusu
+*Subject:* Re: Fly Valiant Docking Project set up in 7606
+
+Hi Cathy,
+
+We have fixed the issue. Going forward, you will no longer receive the project warning, and the Create Accounting report for projects will be clear.
+
+For future transactions, please follow the steps below to ensure correct accounting:
+
+*1. Quantity / Amount should be positive:*
+   Old: -57,883.13
+   New: 57,883.13
+
+*2. Swap the Debit and Credit accounts (vice versa):*
+
+   Old:
+   Debit:  7606-4024-73891005-0000-000000-000000-80000016-9024
+   Credit: 7606-0000-31130038-0000-000000-000000-80000016-9024
+
+   New:
+   Debit:  7606-0000-31130038-0000-000000-000000-80000016-9024
+   Credit: 7606-4024-73891005-0000-000000-000000-80000016-9024
+
+Since the SLA rules are used globally, we will not be able to make changes in Production. Kindly follow the above steps for all future postings.
+
+Thanks & Regards,
+Hemashri S
+Tech Consultant
+DPW FZE POML CORPORATE - CC
 Here is a polite email draft for Dom:
 
 ---
