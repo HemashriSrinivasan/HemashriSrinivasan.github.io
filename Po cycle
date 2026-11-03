@@ -1,4 +1,16 @@
-Here is the professional version of your email in the screenshot:
+Subject: Advise Needed - Prod Fix for 7602 Tax
+
+Hi Avinash,
+
+When tax classification is added manually in intercompany invoice, tax is not populating.
+
+We fixed this in Dev40 by adding our BU's in `Manage Transaction Types` where Name = `Intercompany`. This setup is available globally.
+
+In Prod we don't have access to Transaction Type `Intercompany` to add Phase 2 BUs.
+
+Could you please advise what is to be done to resolve this in Prod?
+
+ThanksHere is the professional version of your email in the screenshot:
 
 ---
 *To:* Cathy Yu
