@@ -1,5 +1,23 @@
-Subject: Advise Needed - Prod Fix for 7602 Tax
+2000198976@hexaware.com: Advise Needed - Prod Fix for 7602 Tax
+Copy-paste this clean version instead of that - same meaning, but professional for Oracle:
 
+---
+
+*Additional Requirement:*
+
+There should also be an option to save the Separate Remittance Advice as a PDF file, in addition to emailing it to the supplier.
+
+Also, how can we confirm whether the remittance advice was sent successfully to the supplier?
+
+For example, in a bulk payment run, if 1 or 2 suppliers did not receive the remittance advice due to an invalid email address, we need a notification / log to identify which suppliers did not receive it.
+
+This will help us to follow up with those suppliers and resend the advice.
+
+Please advise if there is a standard report / log / notification to track failed or undelivered remittance advice emails.
+
+---
+
+Paste this and click *Send*.
 Hi Avinash,
 
 When tax classification is added manually in intercompany invoice, tax is not populating.
