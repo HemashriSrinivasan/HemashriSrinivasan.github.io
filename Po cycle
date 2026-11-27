@@ -14,3 +14,24 @@ Here you go - shorter + formal:
 >
 > Thanks & Regards,
 > Hema
+
+
+Here is a clean version to send to Abhijit:
+
+> Hi Abhijit,
+>
+> I have made changes to the POML PO to Pay report as per the requirement for AUS and PNG entities.
+>
+> As per Swathi's email, I have created a separate template and also added a few columns and updated the query.
+>
+> Please suggest how we can migrate this report, as this report is used globally in the DPW environment.
+>
+> Should we create a separate folder and use it for AUS and PNG entities?
+>
+> Thanks,
+> Hemashri
+
+*My suggestion for you:*
+Yes, don't touch the global report. Create a separate folder like `POML / AUS_PNG` and keep the new template + copy of the report there. That way global users are not impacted and AUS/PNG have their own version.
+
+Want me to add the list of columns you added, so Abhijit understands clearly?
